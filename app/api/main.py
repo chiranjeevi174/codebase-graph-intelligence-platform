@@ -30,7 +30,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title=settings.APP_NAME,
         description="Production-grade Graph RAG Codebase Graph Intelligence Platform",
-        version="1.0.0",
+        version="1.0.1",
         docs_url="/docs",
         redoc_url="/redoc",
         lifespan=lifespan,
