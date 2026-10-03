@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Codebase Graph Intelligence Platform - Developer UI</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <!-- Cytoscape.js Graph Library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.28.1/cytoscape.min.js"></script>
+</head>
+<body>
+
+  <!-- Top App Header -->
+  <header class="app-header">
+    <div class="brand">
+      <div class="brand-icon">🌐</div>
+      <span>Codebase Intelligence</span>
+    </div>
+
+    <div class="header-controls">
+      <label class="form-label" style="margin:0; text-transform:none;">Repo:</label>
+      <select id="repo-select" class="select-input" style="flex:1;">
+        <option value="sample_repo">Sample Repo (Python/FastAPI)</option>
+        <option value="multi_language_repo">Multi-Language Repo (Polyglot)</option>
+        <option value="diff_repo">Diff Repo (Git History)</option>
+      </select>
+
+      <input type="text" id="header-branch-input" class="text-input" value="main" style="width:90px;" placeholder="branch">
+      <input type="text" id="header-commit-input" class="text-input" value="HEAD" style="width:90px;" placeholder="commit">
+    </div>
+
+    <div class="header-status">
+      <div id="health-badge" class="status-badge">
+        <span class="status-dot"></span> Checking System...
+      </div>
+    </div>
+  </header>
+
+  <!-- App Main Container Grid -->
+  <div class="app-container">
+
+    <!-- Left Controls Panel -->
+    <aside class="panel">
+      <div class="panel-header">
+        <span>Analysis Modes</span>
+      </div>
+
+      <div class="panel-body">
+        <!-- Navigation Tabs -->
+        <nav class="nav-tabs">
+          <button class="nav-tab active" data-tab="query">
+            <span>💬</span> Codebase Query
+          </button>
+          <button class="nav-tab" data-tab="impact">
+            <span>🔍</span> Impact Analysis
+          </button>
+          <button class="nav-tab" data-tab="apiflow">
+            <span>🌐</span> API Flow Analysis
+          </button>
+          <button class="nav-tab" data-tab="diff">
+            <span>🔀</span> Structural Git Diff
+          </button>
+          <button class="nav-tab" data-tab="pr">
+            <span>⚡</span> PR Analysis
+          </button>
+        </nav>
+
+        <!-- Repository Ingestion Controls Card -->
+        <div class="card">
+          <div class="card-title">
+            <span>Repository Ingestion</span>
+            <span class="tag tag-blue">Ingest API</span>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Local Directory Path:</label>
+            <input type="text" id="ingest-path-input" class="text-input" placeholder="e.g. tests/fixtures/sample_repo">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Or GitHub Repository URL:</label>
+            <input type="text" id="ingest-url-input" class="text-input" placeholder="https://github.com/org/repo">
+          </div>
+
+          <div style="display:flex; gap:8px;">
+            <input type="text" id="ingest-branch-input" class="text-input" placeholder="branch (optional)" style="flex:1;">
+            <label style="display:flex; align-items:center; gap:4px; font-size:12px; color:var(--text-secondary);">
+              <input type="checkbox" id="ingest-force-input"> Force
+            </label>
+          </div>
+
+          <button id="btn-ingest-repo" class="btn btn-primary" style="width:100%;">
+            Ingest Repository
+          </button>
+        </div>
+
+        <!-- Indexed Repositories List Card -->
+        <div class="card">
+          <div class="card-title">
+            <span>Indexed Repositories</span>
+          </div>
+          <div id="repo-list-container" style="display:flex; flex-direction:column; gap:6px;">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Center Interactive Workspace -->
+    <main class="workspace">
+
+      <!-- View 1: Codebase Query (Graph RAG) -->
+      <section id="view-query" class="workspace-view active">
+        <div class="query-box card">
+          <div class="card-title">
+            <span>Ask About Codebase</span>
+            <span class="tag tag-purple">Graph RAG + RRF</span>
+          </div>
+
+          <textarea id="query-input" class="text-input" rows="3" placeholder="Ask a natural language query about the codebase architecture, symbols, or flow..."></textarea>
+
+          <div class="prompt-suggestions">
+            <span class="prompt-chip" data-prompt="How does authentication work?">How does authentication work?</span>
+            <span class="prompt-chip" data-prompt="Who calls UserService?">Who calls UserService?</span>
+            <span class="prompt-chip" data-prompt="Trace /api/users to the database.">Trace /api/users</span>
+            <span class="prompt-chip" data-prompt="What depends on PaymentService?">PaymentService dependencies</span>
+            <span class="prompt-chip" data-prompt="What changed between HEAD~1 and HEAD?">What changed in last commit?</span>
+          </div>
+
+          <button id="btn-run-query" class="btn btn-primary" style="align-self:flex-end;">
+            Send Question
+          </button>
+        </div>
+
+        <!-- Grounded Answer Card -->
+        <div id="answer-container" class="answer-box" style="display:none;">
+          <div class="answer-header">
+            <span style="font-weight:600; color:var(--text-primary);">Grounded AI Answer</span>
+            <div id="validation-badge" class="status-badge">
+              <span class="status-dot"></span> Validated Evidence
+            </div>
+          </div>
+          <div id="answer-text" class="answer-content"></div>
+
+          <div style="border-top:1px solid var(--border-color); padding-top:10px; margin-top:4px;">
+            <div class="form-label" style="margin-bottom:6px;">Cited Source References (Click to view code):</div>
+            <div id="sources-list" class="sources-list"></div>
+          </div>
+        </div>
+
+        <!-- Interactive Graph Canvas -->
+        <div class="graph-container">
+          <div class="graph-controls-overlay">
+            <button id="btn-zoom-in" class="icon-btn" title="Zoom In">+</button>
+            <button id="btn-zoom-out" class="icon-btn" title="Zoom Out">-</button>
+            <button id="btn-zoom-reset" class="icon-btn" title="Fit to View">⟲</button>
+          </div>
+          <div id="cy-canvas"></div>
+        </div>
+
+        <!-- Debug Trace Panel -->
+        <div class="card">
+          <details>
+            <summary style="font-weight:600; font-size:12px; color:var(--text-secondary); cursor:pointer;">
+              🔍 Retrieval Debug & Reasoning Trace (Graph / Qdrant / RRF)
+            </summary>
+            <div id="debug-trace-container" style="margin-top:10px;">
+              <em style="color:var(--text-muted); font-size:12px;">Run a query to inspect retrieval intent, entity resolution, and RRF rank fusion metrics.</em>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <!-- View 2: Impact Analysis -->
+      <section id="view-impact" class="workspace-view">
+        <div class="card">
+          <div class="card-title">
+            <span>Static Code Impact Analysis</span>
+            <span class="tag tag-amber">Neo4j Graph Traversal</span>
+          </div>
+
+          <div style="display:flex; gap:12px;">
+            <input type="text" id="impact-symbol-input" class="text-input" placeholder="Target Symbol Name (e.g. UserService, process_payment)" style="flex:1;">
+            <select id="impact-hops-input" class="select-input" style="width:110px;">
+              <option value="1">1 Hop</option>
+              <option value="2" selected>2 Hops</option>
+              <option value="3">3 Hops</option>
+            </select>
+            <button id="btn-run-impact" class="btn btn-primary">
+              Run Impact Analysis
+            </button>
+          </div>
+        </div>
+
+        <div id="impact-results" style="display:flex; flex-direction:column; gap:12px;">
+          <em style="color:var(--text-muted)">Enter a symbol above to analyze static dependencies and affected components.</em>
+        </div>
+      </section>
+
+      <!-- View 3: API Flow Analysis -->
+      <section id="view-apiflow" class="workspace-view">
+        <div class="card">
+          <div class="card-title">
+            <span>Cross-Language API & Contract Flow</span>
+            <span class="tag tag-blue">OpenAPI + Endpoints</span>
+          </div>
+
+          <div style="display:flex; gap:12px;">
+            <input type="text" id="apiflow-input" class="text-input" placeholder="API Path or Symbol (e.g. /api/users, HttpClient)" style="flex:1;">
+            <button id="btn-run-apiflow" class="btn btn-primary">
+              Trace API Flow
+            </button>
+          </div>
+        </div>
+
+        <div id="apiflow-results" style="display:flex; flex-direction:column; gap:12px;">
+          <em style="color:var(--text-muted)">Enter an API path or endpoint symbol to trace client-to-backend flow.</em>
+        </div>
+      </section>
+
+      <!-- View 4: Structural Git Diff -->
+      <section id="view-diff" class="workspace-view">
+        <div class="card">
+          <div class="card-title">
+            <span>Structural Git Change Analysis</span>
+            <span class="tag tag-purple">AST Diff</span>
+          </div>
+
+          <div style="display:flex; gap:12px;">
+            <input type="text" id="diff-base-input" class="text-input" value="HEAD~1" placeholder="Base Ref" style="flex:1;">
+            <input type="text" id="diff-target-input" class="text-input" value="HEAD" placeholder="Target Ref" style="flex:1;">
+            <button id="btn-run-diff" class="btn btn-primary">
+              Analyze Structural Diff
+            </button>
+          </div>
+        </div>
+
+        <div id="diff-results" style="display:flex; flex-direction:column; gap:12px;">
+          <em style="color:var(--text-muted)">Click Analyze Structural Diff to compare code revisions across AST signatures.</em>
+        </div>
+      </section>
+
+      <!-- View 5: PR Analysis -->
+      <section id="view-pr" class="workspace-view">
+        <div class="card">
+          <div class="card-title">
+            <span>Pull Request Evidence & Impact Analysis</span>
+            <span class="tag tag-emerald">GitHub / GitLab</span>
+          </div>
+
+          <div style="display:flex; flex-wrap:wrap; gap:10px;">
+            <select id="pr-provider-input" class="select-input" style="width:110px;">
+              <option value="github" selected>GitHub</option>
+              <option value="gitlab">GitLab</option>
+            </select>
+            <input type="text" id="pr-repo-input" class="text-input" value="sample_repo" placeholder="Repository (e.g. owner/repo)" style="flex:1;">
+            <input type="number" id="pr-num-input" class="text-input" value="1" placeholder="PR #" style="width:70px;">
+            <input type="text" id="pr-base-input" class="text-input" value="HEAD~1" placeholder="Base SHA" style="width:100px;">
+            <input type="text" id="pr-target-input" class="text-input" value="HEAD" placeholder="Head SHA" style="width:100px;">
+            <label style="display:flex; align-items:center; gap:4px; font-size:12px; color:var(--text-secondary);">
+              <input type="checkbox" id="pr-dryrun-input" checked> Dry Run
+            </label>
+            <button id="btn-run-pr" class="btn btn-primary">
+              Analyze Pull Request
+            </button>
+          </div>
+        </div>
+
+        <div id="pr-results" style="display:flex; flex-direction:column; gap:12px;">
+          <em style="color:var(--text-muted)">Click Analyze Pull Request to generate an evidence-backed structural PR analysis report.</em>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Right Inspector Panel -->
+    <aside class="panel panel-right">
+      <div class="panel-header">
+        <span>Graph Inspector</span>
+      </div>
+
+      <div class="panel-body">
+        <!-- Node Details Section -->
+        <div id="node-details-container">
+          <div style="color:var(--text-muted); font-size:12px;">
+            Click any graph node on the canvas to inspect detailed attributes, line ranges, and source links.
+          </div>
+        </div>
+
+        <!-- Graph Legend Card -->
+        <div class="card">
+          <div class="card-title">Node Type Legend</div>
+          <div style="display:flex; flex-direction:column; gap:6px; font-size:12px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="width:12px; height:12px; border-radius:50%; background:#60a5fa;"></span> File Node
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="width:12px; height:12px; border-radius:50%; background:#c084fc;"></span> Class Node
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="width:12px; height:12px; border-radius:50%; background:#34d399;"></span> Function / Method Node
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="width:12px; height:12px; border-radius:50%; background:#fbbf24;"></span> API Endpoint Node
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="width:12px; height:12px; border-radius:50%; background:#f472b6;"></span> API Client Call Node
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="width:12px; height:12px; border-radius:50%; background:#38bdf8;"></span> API Contract Node
+            </div>
+          </div>
+        </div>
+
+        <!-- Architecture Overview Card -->
+        <div class="card">
+          <div class="card-title">System Capabilities</div>
+          <ul style="font-size:12px; color:var(--text-secondary); padding-left:16px; display:flex; flex-direction:column; gap:4px;">
+            <li>Multi-hop Neo4j Graph RAG</li>
+            <li>Qdrant Vector Retrieval</li>
+            <li>Reciprocal Rank Fusion (RRF)</li>
+            <li>Tree-sitter AST Parsing</li>
+            <li>Cross-Language API Resolution</li>
+            <li>Structural Signature Diff</li>
+            <li>Answer Groundedness Validation</li>
+          </ul>
+        </div>
+      </div>
+    </aside>
+
+  </div>
+
+  <!-- Source Code Viewer Modal -->
+  <div id="source-modal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <span id="modal-file-title" style="font-family:var(--font-mono); font-weight:600; color:var(--text-primary);">Source Viewer</span>
+        <button id="btn-close-modal" class="btn btn-secondary" style="padding:4px 10px;">✕ Close</button>
+      </div>
+      <div id="modal-code-content" class="modal-body">
+        <!-- Line-numbered source code rendered here -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Main ES Module Bootstrapper -->
+  <script type="module">
+    import { initUI } from "./js/ui.js";
+    document.addEventListener("DOMContentLoaded", () => {
+      initUI();
+    });
+  </script>
+</body>
+</html>

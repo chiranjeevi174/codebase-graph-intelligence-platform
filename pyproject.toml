@@ -1,0 +1,71 @@
+[project]
+name = "codebase-graph-intelligence-platform"
+version = "1.0.0"
+description = "Production-grade Codebase Graph Intelligence Platform with Graph RAG"
+readme = "README.md"
+authors = [
+    { name = "Chiranjeevi", email = "chiranjeevi2034@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.28.0",
+    "pydantic>=2.6.0",
+    "pydantic-settings>=2.2.0",
+    "neo4j>=5.18.0",
+    "qdrant-client>=1.8.0",
+    "sentence-transformers>=2.5.0",
+    "langgraph>=0.0.25",
+    "langchain-core>=0.1.30",
+    "groq>=0.4.0",
+    "google-genai>=0.1.0",
+    "openai>=1.14.0",
+    "pathspec>=0.12.0",
+    "python-dotenv>=1.0.0",
+    "tree-sitter==0.21.3",
+    "tree-sitter-languages==1.10.2",
+    "redis>=5.0.0",
+    "arq>=0.25.0",
+]
+
+[project.scripts]
+codebase-graph-intelligence-platform = "app.cli:main"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+pythonpath = ["."]
+markers = [
+    "integration: tests requiring live Neo4j/Qdrant services",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.pyright]
+include = ["app", "tests", "scripts"]
+exclude = ["**/tests/fixtures/**", "tests/fixtures"]
+extraPaths = [".", "tests/fixtures/sample_repo"]
+venvPath = "."
+venv = ".venv"
+
+[[tool.pyright.executionEnvironments]]
+root = "tests/fixtures/sample_repo"
+extraPaths = ["tests/fixtures/sample_repo"]
+
+[dependency-groups]
+dev = [
+    "types-pyyaml>=6.0.12.20260906",
+]
+
+
+

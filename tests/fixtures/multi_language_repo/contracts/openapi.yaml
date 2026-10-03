@@ -1,0 +1,18 @@
+openapi: 3.0.0
+info:
+  title: User Service API
+  version: 1.0.0
+paths:
+  /api/users:
+    get:
+      operationId: getUsers
+      summary: Get list of users
+      responses:
+        '200':
+          description: Successful response
+    post:
+      operationId: createUser
+      summary: Create a new user
+      responses:
+        '201':
+          description: User created

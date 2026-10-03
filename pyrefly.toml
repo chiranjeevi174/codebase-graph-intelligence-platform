@@ -1,0 +1,6 @@
+project-includes = ["app", "tests", "scripts"]
+python-version = "3.11"
+python-platform = "windows"
+
+[errors]
+bad-specialization = false

@@ -1,0 +1,47 @@
+name: Codebase Graph Intelligence Platform CI
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    name: Build & Test Suite
+    runs-on: ubuntu-latest
+
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv package manager
+        run: curl -sSf https://astral.sh/uv/install.sh | sh
+
+      - name: Install dependencies
+        run: |
+          uv pip install --system -e .
+          uv pip install --system pytest pytest-asyncio pytest-cov ruff
+
+      - name: Code Quality & Linting
+        run: |
+          ruff check app/ scripts/ tests/
+
+      - name: Execute Pytest Suite
+        env:
+          REDIS_URL: redis://localhost:6379
+          ENVIRONMENT: test
+        run: |
+          pytest tests/ -v
