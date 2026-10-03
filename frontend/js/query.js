@@ -34,6 +34,99 @@ export function initQueryView() {
   });
 }
 
+/**
+ * Adapt backend GraphPath items into Cytoscape-compatible nodes and relationships.
+ * Safely handles current GraphPath schema:
+ *   { source_node, target_node, relationships, hop_count, path_sequence }
+ *
+ * @param {Array} graphPaths
+ * @returns {{ nodes: Array, relationships: Array }}
+ */
+function adaptGraphPaths(graphPaths) {
+  const nodes = [];
+  const relationships = [];
+  const seenNodes = new Set();
+
+  if (!Array.isArray(graphPaths)) {
+    return { nodes, relationships };
+  }
+
+  function addNode(rawNode) {
+    if (!rawNode || typeof rawNode !== "object") return null;
+    const id = rawNode.id != null ? String(rawNode.id) : (rawNode.symbol_id != null ? String(rawNode.symbol_id) : null);
+    if (!id) return null;
+
+    if (!seenNodes.has(id)) {
+      seenNodes.add(id);
+      const label = (Array.isArray(rawNode.labels) && rawNode.labels.length > 0)
+        ? rawNode.labels[0]
+        : (rawNode.label || rawNode.symbol_type || "Symbol");
+
+      nodes.push({
+        id: id,
+        name: rawNode.name || rawNode.qualified_name || id,
+        qualified_name: rawNode.qualified_name || "",
+        label: label,
+        file_path: rawNode.file_path || "",
+        start_line: typeof rawNode.start_line === "number" ? rawNode.start_line : 1,
+        end_line: typeof rawNode.end_line === "number" ? rawNode.end_line : 1,
+      });
+    }
+    return id;
+  }
+
+  graphPaths.forEach((p, pIdx) => {
+    if (!p || typeof p !== "object") return;
+
+    const sourceNode = p.source_node;
+    const targetNode = p.target_node;
+    const rels = Array.isArray(p.relationships) ? p.relationships : [];
+    const hopCount = typeof p.hop_count === "number" ? p.hop_count : 1;
+    const pathSequence = Array.isArray(p.path_sequence) ? p.path_sequence : [];
+
+    const sourceId = addNode(sourceNode);
+    const targetId = addNode(targetNode);
+
+    // Backward-compatibility: if legacy p.nodes exists, safely index them
+    if (Array.isArray(p.nodes)) {
+      p.nodes.forEach((n) => addNode(n));
+    }
+
+    // Single-hop path: create direct edge between endpoints
+    if (hopCount === 1 && sourceId && targetId) {
+      let relType = "RELATED";
+      if (rels.length > 0) {
+        if (typeof rels[0] === "string" && rels[0].trim()) {
+          relType = rels[0].trim();
+        } else if (rels[0] && typeof rels[0] === "object" && rels[0].relationship_type) {
+          relType = String(rels[0].relationship_type).trim();
+        }
+      }
+
+      relationships.push({
+        id: `path_edge_${pIdx}_${sourceId}_${targetId}`,
+        source: sourceId,
+        target: targetId,
+        type: relType,
+      });
+    } else if (Array.isArray(p.relationships)) {
+      // Legacy edge support if relationships contains object descriptors
+      p.relationships.forEach((r, rIdx) => {
+        if (r && typeof r === "object" && r.source_id && r.target_id) {
+          relationships.push({
+            id: `sub_${pIdx}_${rIdx}`,
+            source: String(r.source_id),
+            target: String(r.target_id),
+            type: r.relationship_type || "RELATED",
+          });
+        }
+      });
+    }
+  });
+
+  return { nodes, relationships };
+}
+
 export async function handleQuerySubmit() {
   const queryInput = document.getElementById("query-input");
   const queryBtn = document.getElementById("btn-run-query");
@@ -107,40 +200,11 @@ export async function handleQuerySubmit() {
     }
 
     // Render Subgraph visualization if present
-    if (response.graph_paths && response.graph_paths.length > 0) {
-      const subgraphNodes = [];
-      const subgraphRels = [];
-      const seenNodes = new Set();
-
-      response.graph_paths.forEach((p, pIdx) => {
-        p.nodes.forEach((n) => {
-          if (!seenNodes.has(n.symbol_id)) {
-            seenNodes.add(n.symbol_id);
-            subgraphNodes.push({
-              id: n.symbol_id,
-              name: n.name,
-              qualified_name: n.qualified_name,
-              label: n.symbol_type || "Symbol",
-              file_path: n.file_path,
-              start_line: n.start_line,
-              end_line: n.end_line,
-            });
-          }
-        });
-        p.relationships.forEach((r, rIdx) => {
-          subgraphRels.push({
-            id: `sub_${pIdx}_${rIdx}`,
-            source: r.source_id,
-            target: r.target_id,
-            type: r.relationship_type,
-          });
-        });
-      });
-
-      updateGraphData({
-        nodes: subgraphNodes,
-        relationships: subgraphRels,
-      });
+    if (Array.isArray(response.graph_paths) && response.graph_paths.length > 0) {
+      const graphData = adaptGraphPaths(response.graph_paths);
+      if (graphData.nodes.length > 0) {
+        updateGraphData(graphData);
+      }
     }
 
     // Debug Trace Panel
@@ -160,6 +224,10 @@ export async function handleQuerySubmit() {
       }
     }
   } catch (err) {
+    console.error("GRAPH RAG QUERY ERROR:", err);
+    console.error("GRAPH RAG QUERY ERROR MESSAGE:", err?.message);
+    console.error("GRAPH RAG QUERY ERROR STACK:", err?.stack);
+
     if (answerText) {
       answerText.innerHTML = `<span style="color:var(--accent-rose)">Error executing query: ${err.message}</span>`;
     }
