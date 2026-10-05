@@ -132,24 +132,28 @@ def test_pr_analysis_service_dry_run():
 def test_webhook_idempotency_caching():
     """Verify PRWebhookService caches analysis results by idempotency key."""
     settings = get_settings()
+    orig_secret = settings.GITHUB_WEBHOOK_SECRET
     settings.GITHUB_WEBHOOK_SECRET = "testsecret"
 
-    service = PRWebhookService(settings=settings)
-    payload = {
-        "action": "opened",
-        "number": 5,
-        "repository": {"full_name": "org/repo", "name": "repo"},
-        "pull_request": {
-            "title": "PR Test",
-            "head": {"ref": "feat", "sha": "sha12345"},
-            "base": {"ref": "main", "sha": "sha67890"},
-        },
-    }
-    body = b'{"action":"opened"}'
-    sig = "sha256=" + hmac.new(b"testsecret", body, hashlib.sha256).hexdigest()
-    headers = {"X-Hub-Signature-256": sig}
+    try:
+        service = PRWebhookService(settings=settings)
+        payload = {
+            "action": "opened",
+            "number": 5,
+            "repository": {"full_name": "org/repo", "name": "repo"},
+            "pull_request": {
+                "title": "PR Test",
+                "head": {"ref": "feat", "sha": "sha12345"},
+                "base": {"ref": "main", "sha": "sha67890"},
+            },
+        }
+        body = b'{"action":"opened"}'
+        sig = "sha256=" + hmac.new(b"testsecret", body, hashlib.sha256).hexdigest()
+        headers = {"X-Hub-Signature-256": sig}
 
-    res1 = service.process_webhook("github", body, payload, headers, repo_path="tests/fixtures/sample_repo", dry_run=True)
-    res2 = service.process_webhook("github", body, payload, headers, repo_path="tests/fixtures/sample_repo", dry_run=True)
+        res1 = service.process_webhook("github", body, payload, headers, repo_path="tests/fixtures/sample_repo", dry_run=True)
+        res2 = service.process_webhook("github", body, payload, headers, repo_path="tests/fixtures/sample_repo", dry_run=True)
 
-    assert res1.analysis_run_id == res2.analysis_run_id
+        assert res1.analysis_run_id == res2.analysis_run_id
+    finally:
+        settings.GITHUB_WEBHOOK_SECRET = orig_secret

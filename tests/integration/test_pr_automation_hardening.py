@@ -18,11 +18,15 @@ def client():
     return TestClient(app)
 
 
+import uuid
+
+
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_webhook_filtering_and_deduplication(client):
     """Test webhook action policy filtering and duplicate delivery rejection."""
-    headers = {"X-GitHub-Delivery": "delivery_uuid_1001", "X-GitHub-Event": "pull_request"}
+    deliv1 = f"delivery_uuid_{uuid.uuid4().hex[:8]}"
+    headers = {"X-GitHub-Delivery": deliv1, "X-GitHub-Event": "pull_request"}
     
     # 1. Closed event action -> ignored per policy
     closed_payload = {
@@ -41,7 +45,8 @@ async def test_webhook_filtering_and_deduplication(client):
     assert res_dup.json()["status"] == "SKIPPED_DUPLICATE_DELIVERY"
 
     # 3. Valid synchronize action with fresh delivery ID
-    sync_headers = {"X-GitHub-Delivery": "delivery_uuid_1002", "X-GitHub-Event": "pull_request"}
+    deliv2 = f"delivery_uuid_{uuid.uuid4().hex[:8]}"
+    sync_headers = {"X-GitHub-Delivery": deliv2, "X-GitHub-Event": "pull_request"}
     sync_payload = {
         "action": "synchronize",
         "number": 10,
@@ -53,14 +58,18 @@ async def test_webhook_filtering_and_deduplication(client):
     assert res_sync.json()["status"] == "QUEUED"
 
 
+import time
+
+
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_worker_observability_and_pr_history(client):
     """Test worker populates worker_id, duration_ms, and records PR history."""
+    unique_pr = int(time.time() * 1000) % 900000 + 300000
     payload = {
         "provider": "github",
         "repository": "sample_repo",
-        "pr_number": 88,
+        "pr_number": unique_pr,
         "repo_path": "tests/fixtures/sample_repo",
         "base_ref": "HEAD~1",
         "target_ref": "HEAD",
@@ -84,7 +93,7 @@ async def test_worker_observability_and_pr_history(client):
     assert job_data["status"] == "COMPLETED"
 
     # Verify PR history
-    hist_res = client.get(f"/analysis/pr/github/sample_repo/88/history")
+    hist_res = client.get(f"/analysis/pr/github/sample_repo/{unique_pr}/history")
     assert hist_res.status_code == 200
     runs = hist_res.json()
     assert len(runs) >= 1
@@ -96,7 +105,7 @@ async def test_worker_observability_and_pr_history(client):
 async def test_manual_retry_endpoint(client):
     """Test manual retry API endpoint POST /jobs/{job_id}/retry."""
     service = JobService()
-    job = service.submit_pr_job(
+    job = await service.submit_pr_job(
         PRJobRequest(
             provider="github",
             repository="sample_repo",

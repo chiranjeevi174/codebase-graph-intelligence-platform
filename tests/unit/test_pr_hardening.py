@@ -24,10 +24,13 @@ def test_action_normalization():
     assert normalize_action("unknown_action") == PRAction.UNKNOWN
 
 
+import uuid
+
+
 def test_duplicate_delivery_deduplication():
     """Test webhook delivery ID recording and lookup."""
     repo = JobRepository()
-    delivery_id = "delivery_test_999"
+    delivery_id = f"delivery_test_{uuid.uuid4().hex[:8]}"
 
     assert repo.is_duplicate_delivery("github", delivery_id) is False
     repo.record_delivery("github", delivery_id)
@@ -58,7 +61,8 @@ def test_analysis_run_model_and_pr_history():
     assert latest.head_sha == "sha_head_1"
 
 
-def test_dead_letter_and_retry_behavior():
+@pytest.mark.asyncio
+async def test_dead_letter_and_retry_behavior():
     """Test manual job retry resets FAILED / DEAD_LETTER jobs to QUEUED."""
     repo = JobRepository()
     service = JobService(repo=repo)
@@ -75,7 +79,7 @@ def test_dead_letter_and_retry_behavior():
     )
     repo.create_job(job)
 
-    retried_job = service.retry_job("test_dead_job")
+    retried_job = await service.retry_job("test_dead_job")
     assert retried_job.status == PRJobStatus.QUEUED
     assert retried_job.attempt == 1
     assert retried_job.error is None

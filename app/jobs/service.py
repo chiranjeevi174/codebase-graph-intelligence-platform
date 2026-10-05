@@ -27,7 +27,7 @@ class JobService:
         self.queue = queue or PRJobQueue()
         self.settings = settings or get_settings()
 
-    def submit_pr_job(self, request: PRJobRequest) -> PRAnalysisJob:
+    async def submit_pr_job(self, request: PRJobRequest) -> PRAnalysisJob:
         """Submit a PR analysis job for async background worker processing."""
         repo_clean = request.repository.strip()
         base_ref = request.base_ref.strip()
@@ -69,16 +69,12 @@ class JobService:
         self.repo.create_job(job, idempotency_key=idempotency_key)
 
         # Enqueue job to worker queue asynchronously
-        try:
-            loop = asyncio.get_running_loop()
-            loop.create_task(self.queue.enqueue_pr_job(job))
-        except RuntimeError:
-            pass
+        await self.queue.enqueue_pr_job(job)
         logger.info(f"[JobService:job_created] Created and enqueued job '{job.job_id}' for {repo_clean} #{request.pr_number}.")
 
         # If wait=True explicitly requested, execute or poll synchronously
         if request.wait:
-            asyncio.run(execute_pr_job_direct(job.job_id))
+            await execute_pr_job_direct(job.job_id)
             job = self.repo.get_job(job.job_id) or job
 
         return job
@@ -95,7 +91,7 @@ class JobService:
         """List bounded historical jobs with filtering."""
         return self.repo.list_jobs(repository=repository, provider=provider, status=status, limit=limit)
 
-    def retry_job(self, job_id: str) -> PRAnalysisJob:
+    async def retry_job(self, job_id: str) -> PRAnalysisJob:
         """Retry a failed or dead-letter job."""
         job = self.repo.get_job(job_id)
         if not job:
@@ -113,11 +109,7 @@ class JobService:
 
         self.repo.update_job(job)
 
-        try:
-            loop = asyncio.get_running_loop()
-            loop.create_task(self.queue.enqueue_pr_job(job))
-        except RuntimeError:
-            pass
+        await self.queue.enqueue_pr_job(job)
 
         logger.info(f"[JobService:job_retried] Manually retried job '{job.job_id}'.")
         return job

@@ -49,15 +49,37 @@ def test_multilanguage_repository_ingestion():
     assert "go" in langs_in_graph
 
     # 3. Verify Qdrant points payload contains language metadata
+    from qdrant_client.http import models as rest_models
+
     qdrant_client = service.embedding_service.qdrant_store._get_client()
     collection_name = service.embedding_service.qdrant_store.collection_name
-    q_res = qdrant_client.scroll(
-        collection_name=collection_name,
-        limit=50,
-        with_payload=True,
+
+    repo_filter = rest_models.Filter(
+        must=[
+            rest_models.FieldCondition(
+                key="repository_id",
+                match=rest_models.MatchValue(value=result.repository_id),
+            )
+        ]
     )
-    points = q_res[0]
-    payload_languages = {p.payload.get("language") for p in points if p.payload and p.payload.get("repository_id") == result.repository_id}
+
+    all_points = []
+    next_offset = None
+    while True:
+        points, next_offset = qdrant_client.scroll(
+            collection_name=collection_name,
+            scroll_filter=repo_filter,
+            limit=100,
+            with_payload=True,
+            offset=next_offset,
+        )
+        all_points.extend(points)
+        if not next_offset:
+            break
+
+    payload_languages = {
+        p.payload.get("language") for p in all_points if p.payload and p.payload.get("language")
+    }
 
     assert "python" in payload_languages
     assert "javascript" in payload_languages

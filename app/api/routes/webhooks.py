@@ -95,7 +95,7 @@ async def github_webhook(request: Request, response: Response):
     )
 
     job_service = JobService()
-    job = job_service.submit_pr_job(job_req)
+    job = await job_service.submit_pr_job(job_req)
 
     response.status_code = status.HTTP_202_ACCEPTED
     return {
@@ -180,7 +180,7 @@ async def gitlab_webhook(request: Request, response: Response):
     )
 
     job_service = JobService()
-    job = job_service.submit_pr_job(job_req)
+    job = await job_service.submit_pr_job(job_req)
 
     response.status_code = status.HTTP_202_ACCEPTED
     return {

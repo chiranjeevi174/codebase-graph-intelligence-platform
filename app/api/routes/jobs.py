@@ -90,11 +90,11 @@ def get_job_result(job_id: str):
 
 
 @router.post("/{job_id}/retry", response_model=PRAnalysisJob)
-def retry_job(job_id: str):
+async def retry_job(job_id: str):
     """Manually retry a FAILED or DEAD_LETTER PR analysis job."""
     service = JobService()
     try:
-        return service.retry_job(job_id)
+        return await service.retry_job(job_id)
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:

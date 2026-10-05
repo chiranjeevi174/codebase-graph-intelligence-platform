@@ -17,14 +17,18 @@ def client():
     return TestClient(app)
 
 
+import time
+
+
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_async_pr_job_lifecycle(client):
     """Integration test verifying async job creation, execution, state transition, and result retrieval."""
+    unique_pr = int(time.time() * 1000) % 900000 + 100000
     payload = {
         "provider": "github",
         "repository": "sample_repo",
-        "pr_number": 1,
+        "pr_number": unique_pr,
         "repo_path": "tests/fixtures/sample_repo",
         "base_ref": "HEAD~1",
         "target_ref": "HEAD",
@@ -66,10 +70,11 @@ async def test_async_pr_job_lifecycle(client):
 @pytest.mark.asyncio
 async def test_async_pr_job_idempotency(client):
     """Integration test verifying idempotency returns existing job for identical payload."""
+    unique_pr = int(time.time() * 1000) % 900000 + 200000
     payload = {
         "provider": "github",
         "repository": "sample_repo",
-        "pr_number": 42,
+        "pr_number": unique_pr,
         "repo_path": "tests/fixtures/sample_repo",
         "base_ref": "HEAD~1",
         "target_ref": "HEAD",
@@ -104,7 +109,7 @@ async def test_async_pr_job_failure_handling(client):
         target_ref="HEAD",
         dry_run=True,
     )
-    job = service.submit_pr_job(req)
+    job = await service.submit_pr_job(req)
     job.max_attempts = 1
     service.repo.update_job(job)
 

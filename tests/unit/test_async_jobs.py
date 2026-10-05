@@ -58,7 +58,8 @@ def test_job_state_transitions():
     assert job.comment_status == PRCommentStatus.POSTED
 
 
-def test_job_idempotency_creation():
+@pytest.mark.asyncio
+async def test_job_idempotency_creation():
     """Test that identical requests return the same enqueued/completed job."""
     repo = JobRepository()
     service = JobService(repo=repo)
@@ -71,7 +72,7 @@ def test_job_idempotency_creation():
         target_ref="feature-sha1",
         dry_run=True,
     )
-    job1 = service.submit_pr_job(req1)
+    job1 = await service.submit_pr_job(req1)
 
     req2 = PRJobRequest(
         provider="github",
@@ -81,7 +82,7 @@ def test_job_idempotency_creation():
         target_ref="feature-sha1",
         dry_run=True,
     )
-    job2 = service.submit_pr_job(req2)
+    job2 = await service.submit_pr_job(req2)
 
     assert job1.job_id == job2.job_id
 

@@ -23,7 +23,10 @@ class PRJobQueue:
             redis_settings = RedisSettings.from_dsn(self.settings.REDIS_URL)
             arq_pool = await create_pool(redis_settings)
             await arq_pool.enqueue_job("perform_pr_analysis_job", job.model_dump())
-            await arq_pool.close()
+            if hasattr(arq_pool, "aclose"):
+                await arq_pool.aclose()
+            else:
+                await arq_pool.close()
             logger.info(f"[PRJobQueue:job_queued] Enqueued job '{job.job_id}' to ARQ Redis queue.")
             return True
         except Exception as e:

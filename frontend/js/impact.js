@@ -37,7 +37,7 @@ export async function handleImpactSubmit() {
 
   try {
     const payload = {
-      target_symbol: symbol,
+      symbol: symbol,
       repository_id: state.selectedRepository || "default",
       max_hops: hops,
     };

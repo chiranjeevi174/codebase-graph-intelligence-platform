@@ -77,7 +77,7 @@ from app.pr.service import PRAnalysisService
 
 
 @router.post("/analysis/pr")
-def analyze_pull_request(
+async def analyze_pull_request(
     request: PRAnalysisRequest,
     wait: bool = Query(False, description="Whether to wait synchronously for PR analysis completion (default: False)"),
 ):
@@ -100,7 +100,7 @@ def analyze_pull_request(
             wait=False,
         )
         service = JobService()
-        job = service.submit_pr_job(job_req)
+        job = await service.submit_pr_job(job_req)
         return JSONResponse(
             status_code=status.HTTP_202_ACCEPTED,
             content=job.model_dump(mode="json"),
