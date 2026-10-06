@@ -25,13 +25,11 @@ jobs:
         ports:
           - 7474:7474
           - 7687:7687
-        options: --health-cmd "wget --no-verbose --tries=1 --spider http://localhost:7474 || exit 1" --health-interval 10s --health-timeout 5s --health-retries 10
 
       qdrant:
         image: qdrant/qdrant:latest
         ports:
           - 6333:6333
-        options: --health-cmd "curl -f http://localhost:6333/readyz || exit 1" --health-interval 5s --health-timeout 3s --health-retries 10
 
     env:
       ENVIRONMENT: test
@@ -59,6 +57,32 @@ jobs:
 
       - name: Install dependencies
         run: uv sync --locked
+
+      - name: Wait for Qdrant
+        run: |
+          for i in {1..30}; do
+            if curl -fsS http://localhost:6333/readyz; then
+              echo "Qdrant is ready"
+              exit 0
+            fi
+            echo "Waiting for Qdrant..."
+            sleep 2
+          done
+          echo "Qdrant failed to become ready"
+          exit 1
+
+      - name: Wait for Neo4j
+        run: |
+          for i in {1..30}; do
+            if curl -fsS http://localhost:7474; then
+              echo "Neo4j is ready"
+              exit 0
+            fi
+            echo "Waiting for Neo4j..."
+            sleep 2
+          done
+          echo "Neo4j failed to become ready"
+          exit 1
 
       - name: Seed Sample Repository
         run: uv run python scripts/ingest_repository.py --repo tests/fixtures/sample_repo
