@@ -1,6 +1,7 @@
 """Integration test for Pull Request analysis using deterministic diff_repo fixture."""
 
 import pytest
+
 from app.pr.models import PRAnalysisRequest
 from app.pr.service import PRAnalysisService
 

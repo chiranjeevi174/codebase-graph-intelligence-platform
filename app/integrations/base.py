@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class RepositoryReference(BaseModel):
@@ -65,29 +65,25 @@ class PRProvider(ABC):
     @abstractmethod
     def verify_webhook(self, payload_bytes: bytes, headers: dict[str, str], secret: str) -> bool:
         """Verify webhook payload authenticity using constant-time signature comparison."""
-        pass
 
     @abstractmethod
     def parse_event(self, payload: dict[str, Any], headers: dict[str, str]) -> PullRequestEvent:
         """Parse raw webhook JSON payload into structured PullRequestEvent."""
-        pass
 
     @abstractmethod
     def get_pull_request(self, repository: str, pr_number: int) -> PullRequestMetadata:
         """Fetch PR/MR metadata via provider REST API."""
-        pass
 
     @abstractmethod
-    def find_existing_comment_id(self, repository: str, pr_number: int, marker: str = "<!-- codebase-graph-intelligence-platform -->") -> str | None:
+    def find_existing_comment_id(
+        self, repository: str, pr_number: int, marker: str = "<!-- codebase-graph-intelligence-platform -->"
+    ) -> str | None:
         """Find ID of existing automated analysis comment matching marker tag."""
-        pass
 
     @abstractmethod
     def post_comment(self, repository: str, pr_number: int, body: str) -> PRComment:
         """Post a new analysis comment on the specified PR/MR."""
-        pass
 
     @abstractmethod
     def update_comment(self, repository: str, comment_id: str, body: str) -> PRComment:
         """Update an existing analysis comment on the specified PR/MR."""
-        pass

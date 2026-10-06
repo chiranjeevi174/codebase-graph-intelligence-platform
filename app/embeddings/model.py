@@ -45,7 +45,7 @@ class HuggingFaceEmbedder(BaseEmbedder):
                 dummy_vec = self._model.encode("test", convert_to_numpy=True)
                 self._dimension = len(dummy_vec)
                 logger.info(f"Loaded embedding model '{self.model_name}' with dimension {self._dimension}.")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 # Hugging Face model loading error boundary
                 raise EmbeddingError(f"Failed to load Hugging Face embedding model '{self.model_name}': {e}")
 
     def embed_text(self, text: str) -> list[float]:
@@ -56,7 +56,7 @@ class HuggingFaceEmbedder(BaseEmbedder):
         try:
             vec = self._model.encode(text, normalize_embeddings=True)
             return vec.tolist()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 # SentenceTransformer encoding error boundary
             raise EmbeddingError(f"Failed to embed text: {e}")
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
@@ -69,7 +69,7 @@ class HuggingFaceEmbedder(BaseEmbedder):
         try:
             vecs = self._model.encode(texts, normalize_embeddings=True, show_progress_bar=False)
             return vecs.tolist()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 # SentenceTransformer batch encoding error boundary
             raise EmbeddingError(f"Failed to embed document batch: {e}")
 
     @property

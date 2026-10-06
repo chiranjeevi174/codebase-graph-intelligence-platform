@@ -1,7 +1,7 @@
 """Pydantic models for evaluation framework, metrics, and report structures."""
 
 from enum import Enum
-from typing import Any
+
 from pydantic import BaseModel, Field
 
 

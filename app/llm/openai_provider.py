@@ -1,9 +1,8 @@
 """OpenAI LLM Provider implementation."""
 
-
 from typing import Any
 
-from openai import AsyncOpenAI, OpenAI
+from openai import AsyncOpenAI, OpenAI, OpenAIError
 
 from app.config.settings import Settings, get_settings
 from app.llm.adapters import to_openai_messages
@@ -58,7 +57,7 @@ class OpenAIProvider(BaseLLMProvider):
                 max_tokens=max_tokens,
             )
             return response.choices[0].message.content or ""
-        except Exception as e:
+        except (OpenAIError, Exception) as e:  # noqa: BLE001
             raise LLMProviderError(f"OpenAI generation error: {e}")
 
     async def agenerate(
@@ -83,7 +82,7 @@ class OpenAIProvider(BaseLLMProvider):
                 max_tokens=max_tokens,
             )
             return response.choices[0].message.content or ""
-        except Exception as e:
+        except (OpenAIError, Exception) as e:  # noqa: BLE001
             raise LLMProviderError(f"OpenAI async generation error: {e}")
 
     @property

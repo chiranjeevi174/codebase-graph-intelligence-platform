@@ -2,11 +2,9 @@
 
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch
 
 from app.api.main import create_app
 from app.jobs.models import PRJobRequest, PRJobStatus
-from app.jobs.repository import JobRepository
 from app.jobs.service import JobService
 from app.jobs.worker import execute_pr_job_direct
 
@@ -27,7 +25,7 @@ async def test_webhook_filtering_and_deduplication(client):
     """Test webhook action policy filtering and duplicate delivery rejection."""
     deliv1 = f"delivery_uuid_{uuid.uuid4().hex[:8]}"
     headers = {"X-GitHub-Delivery": deliv1, "X-GitHub-Event": "pull_request"}
-    
+
     # 1. Closed event action -> ignored per policy
     closed_payload = {
         "action": "closed",

@@ -2,7 +2,6 @@
 
 from app.pr.models import PRAnalysisResult
 
-
 MARKER = "<!-- codebase-graph-intelligence-platform -->"
 
 
@@ -87,7 +86,7 @@ class PRCommentFormatter:
 {cross_section}
 
 ### Explanation
-{result.explanation or 'Static structural diff and impact analysis compiled.'}
+{result.explanation or "Static structural diff and impact analysis compiled."}
 
 ### Evidence
 {ev_section}
@@ -100,4 +99,3 @@ class PRCommentFormatter:
 - **Base SHA:** {result.base_sha}
 - **Head SHA:** {result.head_sha}
 """
-

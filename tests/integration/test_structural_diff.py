@@ -1,9 +1,9 @@
 """Integration tests for structural Git diff and change impact analysis."""
 
-import os
 import shutil
 import subprocess
 from pathlib import Path
+
 import pytest
 
 from app.diff.diff_analyzer import StructuralDiffAnalyzer

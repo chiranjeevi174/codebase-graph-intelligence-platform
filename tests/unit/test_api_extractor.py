@@ -22,7 +22,7 @@ app = FastAPI()
 def get_users():
     return []
 """
-    endpoints, client_calls, contracts = extractor.extract_from_content(py_file, py_code, "test_repo")
+    endpoints, _client_calls, contracts = extractor.extract_from_content(py_file, py_code, "test_repo")
     assert len(endpoints) == 1
     assert endpoints[0].http_method == "GET"
     assert endpoints[0].path == "/api/users"
@@ -43,7 +43,7 @@ paths:
       operationId: getUsers
       summary: Get users
 """
-    endpoints, client_calls, contracts = extractor.extract_from_content(yaml_file, yaml_code, "test_repo")
+    _endpoints, _client_calls, contracts = extractor.extract_from_content(yaml_file, yaml_code, "test_repo")
     assert len(contracts) == 1
     assert contracts[0].http_method == "GET"
     assert contracts[0].path_template == "/api/users"
@@ -67,7 +67,7 @@ export async function postUser(data: any) {
     return axios.post("/api/users", data);
 }
 """
-    endpoints, client_calls, contracts = extractor.extract_from_content(ts_file, ts_code, "test_repo")
+    _endpoints, client_calls, _contracts = extractor.extract_from_content(ts_file, ts_code, "test_repo")
     assert len(client_calls) == 2
     methods = {c.http_method for c in client_calls}
     urls = {c.url for c in client_calls}

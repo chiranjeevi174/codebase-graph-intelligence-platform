@@ -82,7 +82,9 @@ class GitLabProvider(PRProvider):
             action="update",
         )
 
-    def find_existing_comment_id(self, repository: str, pr_number: int, marker: str = "<!-- codebase-graph-intelligence-platform -->") -> str | None:
+    def find_existing_comment_id(
+        self, repository: str, pr_number: int, marker: str = "<!-- codebase-graph-intelligence-platform -->"
+    ) -> str | None:
         """Search MR notes for existing marker tag."""
         return None
 

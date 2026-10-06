@@ -1,10 +1,9 @@
 """JobRepository persistence abstraction layer over Redis with in-memory fallback."""
 
-import json
 from typing import Any
 
 from app.config.settings import Settings, get_settings
-from app.jobs.models import PRAnalysisJob, PRCommentStatus, PRJobStatus
+from app.jobs.models import PRAnalysisJob
 from app.pr.models import PRAnalysisResult
 from app.utils.logger import logger
 
@@ -26,6 +25,7 @@ class JobRepository:
         """Attempt to establish Redis client connection; returns None if Redis unavailable in dev/test."""
         try:
             import redis
+
             client: Any = redis.Redis.from_url(
                 self.settings.REDIS_URL,
                 decode_responses=True,
@@ -35,9 +35,11 @@ class JobRepository:
             )
             client.ping()
             return client
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — Redis client connection check boundary
             if self.settings.ENVIRONMENT == "production":
-                raise RuntimeError(f"[JobRepository] Production environment requires operational Redis at '{self.settings.REDIS_URL}': {e}")
+                raise RuntimeError(
+                    f"[JobRepository] Production environment requires operational Redis at '{self.settings.REDIS_URL}': {e}"
+                )
             return None
 
     def record_delivery(self, provider: str, delivery_id: str) -> None:
@@ -50,7 +52,7 @@ class JobRepository:
             try:
                 r.set(key, "1", ex=self.settings.IDEMPOTENCY_TTL_SECONDS)
                 return
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — Redis error boundary with in-memory fallback
                 logger.warning(f"[JobRepository] Redis error on record_delivery: {e}")
 
         _MEMORY_DELIVERIES.add(key)
@@ -64,7 +66,7 @@ class JobRepository:
         if r:
             try:
                 return bool(r.exists(key))
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — Redis error boundary with in-memory fallback
                 logger.warning(f"[JobRepository] Redis error on is_duplicate_delivery: {e}")
 
         return key in _MEMORY_DELIVERIES
@@ -81,7 +83,7 @@ class JobRepository:
                 r.ltrim(key, 0, 99)
                 r.expire(key, self.settings.JOB_TTL_SECONDS * 7)
                 return
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — Redis error boundary with in-memory fallback
                 logger.warning(f"[JobRepository] Redis error on save_analysis_run: {e}")
 
         if key not in _MEMORY_RUNS:
@@ -105,7 +107,7 @@ class JobRepository:
                     history.append(PRAnalysisRun.model_validate_json(raw))
                 if history:
                     return history
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — Redis error boundary with in-memory fallback
                 logger.warning(f"[JobRepository] Redis error on get_pr_history: {e}")
 
         mem_items = _MEMORY_RUNS.get(key, [])
@@ -123,7 +125,7 @@ class JobRepository:
                     r.set(f"idempotency:{idempotency_key}", job.job_id, ex=self.settings.IDEMPOTENCY_TTL_SECONDS)
                 logger.info(f"[JobRepository] Persisted job '{job.job_id}' to Redis.")
                 return job
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — Redis error boundary with in-memory fallback
                 logger.warning(f"[JobRepository] Redis error on create_job: {e}. Falling back to memory.")
 
         _MEMORY_JOBS[job.job_id] = job
@@ -139,7 +141,7 @@ class JobRepository:
                 val = r.get(f"job:{job_id}")
                 if val:
                     return PRAnalysisJob.model_validate_json(val)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — Redis error boundary with in-memory fallback
                 logger.warning(f"[JobRepository] Redis error on get_job: {e}")
 
         return _MEMORY_JOBS.get(job_id)
@@ -153,7 +155,7 @@ class JobRepository:
             try:
                 r.set(f"job:{job.job_id}", job_json, ex=self.settings.JOB_TTL_SECONDS)
                 return job
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — Redis error boundary with in-memory fallback
                 logger.warning(f"[JobRepository] Redis error on update_job: {e}")
 
         _MEMORY_JOBS[job.job_id] = job
@@ -168,7 +170,7 @@ class JobRepository:
             try:
                 r.set(f"result:{job_id}", res_json, ex=self.settings.JOB_TTL_SECONDS)
                 return
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — Redis error boundary with in-memory fallback
                 logger.warning(f"[JobRepository] Redis error on save_job_result: {e}")
 
         _MEMORY_RESULTS[job_id] = result
@@ -181,7 +183,7 @@ class JobRepository:
                 val = r.get(f"result:{job_id}")
                 if val:
                     return PRAnalysisResult.model_validate_json(val)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — Redis error boundary with in-memory fallback
                 logger.warning(f"[JobRepository] Redis error on get_job_result: {e}")
 
         return _MEMORY_RESULTS.get(job_id)
@@ -194,8 +196,8 @@ class JobRepository:
         if r:
             try:
                 job_id = r.get(f"idempotency:{idempotency_key}")
-            except Exception:
-                pass
+            except Exception as e:  # noqa: BLE001 — Redis error boundary with in-memory fallback
+                logger.warning(f"[JobRepository] Redis error on find_existing_job_by_key: {e}")
 
         if not job_id:
             job_id = _MEMORY_IDEMPOTENCY.get(idempotency_key)
@@ -217,12 +219,12 @@ class JobRepository:
         r = self._get_redis_client()
         if r:
             try:
-                keys = r.keys("job:*")[:limit * 2]
+                keys = r.keys("job:*")[: limit * 2]
                 for k in keys:
                     val = r.get(k)
                     if val:
                         all_jobs.append(PRAnalysisJob.model_validate_json(val))
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — Redis error boundary with in-memory fallback
                 logger.warning(f"[JobRepository] Redis error on list_jobs: {e}")
 
         if not all_jobs:
@@ -240,4 +242,3 @@ class JobRepository:
             filtered.append(j)
 
         return filtered[:limit]
-

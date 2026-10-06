@@ -1,10 +1,9 @@
 """Signature change comparison module."""
 
 import re
-from typing import Any
 
 from app.diff.diff_models import SignatureChangeInfo
-from app.models.entities import CodeSymbol, FunctionInfo, MethodInfo
+from app.models.entities import CodeSymbol
 
 
 def _parse_param_parts(param_str: str) -> tuple[str, str | None, str | None]:
@@ -75,7 +74,7 @@ def compare_signatures(
     # Order check on common params
     common_old = [n for n in old_names if n in new_names]
     common_new = [n for n in new_names if n in old_names]
-    order_changed = (common_old != common_new)
+    order_changed = common_old != common_new
 
     # Check defaults and type annotations for common parameters
     old_dict = {p[0]: p for p in old_filtered if p[0]}
@@ -92,15 +91,10 @@ def compare_signatures(
         if op[1] != np[1] and (op[1] is not None or np[1] is not None):
             type_changed = True
 
-    return_changed = (old_return != new_return)
+    return_changed = old_return != new_return
 
     sig_changed = (
-        bool(param_added)
-        or bool(param_removed)
-        or order_changed
-        or default_changed
-        or type_changed
-        or return_changed
+        bool(param_added) or bool(param_removed) or order_changed or default_changed or type_changed or return_changed
     )
 
     old_sig_str = f"({', '.join(old_params)})" + (f" -> {old_return}" if old_return else "")

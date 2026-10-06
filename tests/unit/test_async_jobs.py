@@ -1,6 +1,7 @@
 """Unit tests for async PR analysis job infrastructure, models, repository, and queue."""
 
 import pytest
+
 from app.jobs.models import (
     PRAnalysisJob,
     PRCommentStatus,

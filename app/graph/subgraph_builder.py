@@ -144,4 +144,3 @@ class SubgraphBuilder:
             edges=edges_list,
             paths=paths_list,
         )
-

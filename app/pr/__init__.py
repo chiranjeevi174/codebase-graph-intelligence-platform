@@ -11,11 +11,11 @@ from app.pr.service import PRAnalysisService
 from app.pr.webhook_service import PRWebhookService
 
 __all__ = [
+    "PRAnalysisEvidence",
     "PRAnalysisRequest",
     "PRAnalysisResult",
-    "PRAnalysisSummary",
-    "PRAnalysisEvidence",
-    "PRCommentFormatter",
     "PRAnalysisService",
+    "PRAnalysisSummary",
+    "PRCommentFormatter",
     "PRWebhookService",
 ]

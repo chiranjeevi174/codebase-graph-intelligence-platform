@@ -1,7 +1,6 @@
 """PR Analysis Service orchestrating structural diff, impact analysis, Qdrant evidence, and PR comment posting."""
 
 import hashlib
-from typing import Any
 
 from app.analysis.impact_service import CodeImpactAnalysisService
 from app.diff.diff_analyzer import StructuralDiffAnalyzer
@@ -49,7 +48,9 @@ class PRAnalysisService:
         run_key = f"{request.provider}:{repo}:{pr_num}:{base_ref}:{target_ref}"
         run_id = f"pr_run_{hashlib.md5(run_key.encode('utf-8')).hexdigest()[:12]}"
 
-        logger.info(f"[PRAnalysisService:pr_analysis_started] Starting PR analysis for {repo} #{pr_num} (Run ID: {run_id})")
+        logger.info(
+            f"[PRAnalysisService:pr_analysis_started] Starting PR analysis for {repo} #{pr_num} (Run ID: {run_id})"
+        )
 
         # Step 1: Execute Structural Git Diff
         diff_req = DiffRequest(
@@ -64,7 +65,7 @@ class PRAnalysisService:
 
         try:
             diff_res = self.diff_analyzer.analyze_diff(diff_req)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — Fallback gracefully if diff analysis fails
             logger.warning(f"[PRAnalysisService] Structural diff error for {repo}: {e}")
             diff_res = None
 
@@ -83,16 +84,18 @@ class PRAnalysisService:
         ]
 
         sig_changes = []
-        for sc in (struct_diff.symbols_changed if struct_diff else []):
+        for sc in struct_diff.symbols_changed if struct_diff else []:
             if sc.signature_change and sc.signature_change.signature_changed:
-                sig_changes.append({
-                    "symbol_name": sc.symbol_name,
-                    "qualified_name": sc.qualified_name,
-                    "old_signature": sc.signature_change.old_signature,
-                    "new_signature": sc.signature_change.new_signature,
-                    "added_parameters": sc.signature_change.parameter_added,
-                    "removed_parameters": sc.signature_change.parameter_removed,
-                })
+                sig_changes.append(
+                    {
+                        "symbol_name": sc.symbol_name,
+                        "qualified_name": sc.qualified_name,
+                        "old_signature": sc.signature_change.old_signature,
+                        "new_signature": sc.signature_change.new_signature,
+                        "added_parameters": sc.signature_change.parameter_added,
+                        "removed_parameters": sc.signature_change.parameter_removed,
+                    }
+                )
 
         api_changes = [
             {
@@ -104,7 +107,9 @@ class PRAnalysisService:
             for ac in (struct_diff.api_changes if struct_diff else [])
         ]
 
-        logger.info(f"[PRAnalysisService:pr_diff_completed] Found {len(changed_files)} changed files and {len(changed_symbols)} changed symbols.")
+        logger.info(
+            f"[PRAnalysisService:pr_diff_completed] Found {len(changed_files)} changed files and {len(changed_symbols)} changed symbols."
+        )
 
         # Step 2: Impact Analysis around changed symbols
         affected_files_set = set(changed_files)
@@ -112,7 +117,7 @@ class PRAnalysisService:
         cross_language_impacts = []
         evidence_items = []
 
-        for sc in (struct_diff.symbols_changed if struct_diff else []):
+        for sc in struct_diff.symbols_changed if struct_diff else []:
             sym_name = sc.qualified_name or sc.symbol_name
             try:
                 imp_res = self.impact_service.analyze_impact(
@@ -132,10 +137,12 @@ class PRAnalysisService:
                 # Cross-language API check
                 flows = self.graph_query_manager.find_api_flow(sym_name, max_hops=request.max_hops)
                 for fl in flows:
-                    cross_language_impacts.append({
-                        "symbol": sym_name,
-                        "description": f"Cross-language flow: {' -> '.join(fl.get('path_relationships', []))}",
-                    })
+                    cross_language_impacts.append(
+                        {
+                            "symbol": sym_name,
+                            "description": f"Cross-language flow: {' -> '.join(fl.get('path_relationships', []))}",
+                        }
+                    )
 
                 # Collect static evidence
                 evidence_items.append(
@@ -147,10 +154,12 @@ class PRAnalysisService:
                         description=f"Symbol modified: {sc.symbol_name} ({sc.symbol_type})",
                     )
                 )
-            except Exception as ie:
+            except Exception as ie:  # noqa: BLE001 — Impact analysis fallback per symbol
                 logger.debug(f"Impact check warning for {sym_name}: {ie}")
 
-        logger.info(f"[PRAnalysisService:pr_impact_completed] Identified {len(affected_components_set)} affected components across {len(affected_files_set)} files.")
+        logger.info(
+            f"[PRAnalysisService:pr_impact_completed] Identified {len(affected_components_set)} affected components across {len(affected_files_set)} files."
+        )
 
         # Step 3: Supporting Qdrant Vector Context Retrieval
         if changed_symbols:
@@ -170,7 +179,7 @@ class PRAnalysisService:
                             description="Supporting semantic context retrieved from Qdrant",
                         )
                     )
-            except Exception as qe:
+            except Exception as qe:  # noqa: BLE001 — Vector store optional context retrieval boundary
                 logger.debug(f"Qdrant evidence warning: {qe}")
 
         # Step 4: Summary Aggregation
@@ -193,8 +202,8 @@ class PRAnalysisService:
                 fused_results=[],
                 resolved_entities=[],
             )
-        except Exception:
-            pass
+        except Exception as ve:  # noqa: BLE001 # Non-blocking answer validation resilience boundary
+            logger.warning(f"Answer validation warning during PR analysis: {ve}")
 
         result = PRAnalysisResult(
             analysis_run_id=run_id,
@@ -210,8 +219,8 @@ class PRAnalysisService:
             relationship_changes=[],
             api_changes=api_changes,
             contract_changes=[],
-            affected_components=sorted(list(affected_components_set)),
-            affected_files=sorted(list(affected_files_set)),
+            affected_components=sorted(affected_components_set),
+            affected_files=sorted(affected_files_set),
             cross_language_impacts=cross_language_impacts,
             evidence=evidence_items,
             explanation=explanation or "Static PR analysis completed.",
@@ -227,12 +236,16 @@ class PRAnalysisService:
                 existing_comment_id = provider.find_existing_comment_id(request.repository, request.pr_number)
                 if existing_comment_id:
                     comment_obj = provider.update_comment(request.repository, existing_comment_id, comment_body)
-                    logger.info(f"[PRAnalysisService:pr_comment_updated] Updated existing PR comment ({existing_comment_id}) on {request.repository} #{request.pr_number}")
+                    logger.info(
+                        f"[PRAnalysisService:pr_comment_updated] Updated existing PR comment ({existing_comment_id}) on {request.repository} #{request.pr_number}"
+                    )
                 else:
                     comment_obj = provider.post_comment(request.repository, request.pr_number, comment_body)
-                    logger.info(f"[PRAnalysisService:pr_comment_posted] Posted new PR comment on {request.repository} #{request.pr_number}")
+                    logger.info(
+                        f"[PRAnalysisService:pr_comment_posted] Posted new PR comment on {request.repository} #{request.pr_number}"
+                    )
                 result.comment = comment_obj
-            except Exception as pe:
+            except Exception as pe:  # noqa: BLE001 — External SCM provider comment posting boundary
                 logger.warning(f"Failed posting PR comment: {pe}")
 
         logger.info(f"[PRAnalysisService:pr_analysis_completed] Completed PR analysis run {run_id}.")

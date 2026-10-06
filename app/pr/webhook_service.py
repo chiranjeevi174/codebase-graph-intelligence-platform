@@ -1,6 +1,6 @@
 """PR Webhook Service handling signature verification, event parsing, and idempotency."""
 
-from typing import Any
+from typing import Any, ClassVar
 
 from app.config.settings import Settings, get_settings
 from app.integrations.factory import PRProviderFactory
@@ -13,7 +13,7 @@ class PRWebhookService:
     """Orchestrates incoming webhooks, authenticity verification, idempotency, and analysis execution."""
 
     # In-memory idempotency cache: run_key -> PRAnalysisResult
-    _ANALYSIS_CACHE: dict[str, PRAnalysisResult] = {}
+    _ANALYSIS_CACHE: ClassVar[dict[str, PRAnalysisResult]] = {}
 
     def __init__(self, pr_service: PRAnalysisService | None = None, settings: Settings | None = None):
         self.pr_service = pr_service or PRAnalysisService()
@@ -32,14 +32,18 @@ class PRWebhookService:
         provider = PRProviderFactory.get_provider(provider_name, settings=self.settings)
 
         # 1. Verification
-        secret = self.settings.GITHUB_WEBHOOK_SECRET if provider_name == "github" else self.settings.GITLAB_WEBHOOK_SECRET
+        secret = (
+            self.settings.GITHUB_WEBHOOK_SECRET if provider_name == "github" else self.settings.GITLAB_WEBHOOK_SECRET
+        )
         if secret:
             if not provider.verify_webhook(payload_bytes, headers, secret):
                 logger.warning(f"[PRWebhookService] Webhook verification failed for provider '{provider_name}'.")
                 raise ValueError("Invalid webhook signature or token authorization failed.")
             logger.info(f"[PRWebhookService:pr_webhook_verified] Verified {provider_name} webhook signature.")
         else:
-            logger.info(f"[PRWebhookService:pr_webhook_received] Received {provider_name} webhook (secret unconfigured).")
+            logger.info(
+                f"[PRWebhookService:pr_webhook_received] Received {provider_name} webhook (secret unconfigured)."
+            )
 
         # 2. Event Parsing
         event = provider.parse_event(payload_dict, headers)

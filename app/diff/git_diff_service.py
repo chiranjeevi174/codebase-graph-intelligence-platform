@@ -1,9 +1,7 @@
 """Service layer for low-level Git metadata and diff extraction."""
 
-import os
 import subprocess
 from pathlib import Path
-from typing import Any
 
 from app.diff.diff_models import ChangeType, FileChange
 from app.parsing.language import detect_language
@@ -37,7 +35,7 @@ class GitDiffService:
         """Resolve a Git reference (branch, tag, HEAD~1) to a full commit SHA."""
         try:
             return self._run_git(["rev-parse", ref])
-        except Exception:
+        except Exception:  # noqa: BLE001 — Safe git ref resolution fallback
             # Fallback if ref is already a 40-char SHA or invalid
             return ref
 
@@ -63,7 +61,7 @@ class GitDiffService:
                 continue
 
             status_code = parts[0]
-            
+
             if status_code.startswith("R"):
                 # Rename: format is R100 old_path new_path
                 old_path = parts[1]
@@ -80,7 +78,7 @@ class GitDiffService:
                 new_path = None
                 status = ChangeType.REMOVED
                 primary_path = old_path
-            else: # M or others
+            else:  # M or others
                 old_path = parts[1]
                 new_path = parts[1]
                 status = ChangeType.MODIFIED
@@ -107,6 +105,6 @@ class GitDiffService:
         """Retrieve source code text for a specific file at a given Git reference."""
         try:
             return self._run_git(["show", f"{ref}:{file_path}"])
-        except Exception:
+        except Exception:  # noqa: BLE001 — Safe fallback for file missing at git ref
             # File might not exist at that ref (e.g. newly added or deleted)
             return None

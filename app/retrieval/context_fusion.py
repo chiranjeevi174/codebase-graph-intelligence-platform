@@ -64,12 +64,9 @@ class ContextFusion:
                 sym_header = f"Symbol: {res.qualified_name or res.symbol_name or 'N/A'}"
                 prov = f"[Source: {res.source.upper()} | RRF Score: {res.rrf_score:.4f}]"
                 citation = f"File: {res.file_path}:{res.start_line}-{res.end_line}"
-                
+
                 snippet = (
-                    f"--- Snippet #{idx} ({prov}) ---\n"
-                    f"{sym_header}\n"
-                    f"{citation}\n\n"
-                    f"```\n{res.content.strip()}\n```"
+                    f"--- Snippet #{idx} ({prov}) ---\n{sym_header}\n{citation}\n\n```\n{res.content.strip()}\n```"
                 )
                 code_lines.append(snippet)
             sections.append("\n".join(code_lines))

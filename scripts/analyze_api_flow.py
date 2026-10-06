@@ -1,8 +1,6 @@
 """CLI script for inspecting cross-language API flows in Neo4j graph data."""
 
 import argparse
-import json
-import sys
 
 from app.graph.graph_queries import GraphQueryManager
 

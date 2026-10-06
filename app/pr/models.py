@@ -1,6 +1,7 @@
 """Pydantic data models for Pull Request analysis and automated reviews."""
 
 from typing import Any
+
 from pydantic import BaseModel, Field
 
 from app.integrations.base import PRComment

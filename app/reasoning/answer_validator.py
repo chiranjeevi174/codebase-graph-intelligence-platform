@@ -1,7 +1,6 @@
 """Answer Validator inspecting generated LLM answers for strict grounding in retrieved evidence."""
 
 import re
-
 from typing import Any
 
 from app.models.entities import NormalizedSearchResult, ResolvedEntity
@@ -29,7 +28,7 @@ class AnswerValidator:
         # Collect valid file paths from retrieved context
         valid_files: set[str] = set()
         valid_file_basenames: set[str] = set()
-        
+
         for entity in resolved_entities:
             if entity.file_path:
                 valid_files.add(entity.file_path)
@@ -64,17 +63,19 @@ class AnswerValidator:
 
         # Find potential file references in answer e.g. src/api/orders.py or order_service.py:20-45
         file_citation_pattern = re.compile(
-            r'\b([a-zA-Z0-9_\-/\\]+\.(?:py|js|ts|java|go|cpp|h|cs|rb|php))\b(?:[:\s]+(\d+)(?:-(\d+))?)?'
+            r"\b([a-zA-Z0-9_\-/\\]+\.(?:py|js|ts|java|go|cpp|h|cs|rb|php))\b(?:[:\s]+(\d+)(?:-(\d+))?)?"
         )
         matches = file_citation_pattern.findall(answer)
 
         for fpath, start_str, end_str in matches:
             basename = fpath.split("/")[-1].split("\\")[-1]
-            if fpath not in valid_files and basename not in valid_file_basenames:
-                # Ignore system / general mentions if not clearly claiming code location
-                if not any(fpath.startswith(prefix) for prefix in ["http://", "https://", "file://"]):
-                    logger.warning(f"Validation warning: Cited file '{fpath}' not found in retrieved context.")
-                    errors.append(f"Answer cited ungrounded file path: '{fpath}'")
+            if (
+                fpath not in valid_files
+                and basename not in valid_file_basenames
+                and not any(fpath.startswith(prefix) for prefix in ["http://", "https://", "file://"])
+            ):
+                logger.warning(f"Validation warning: Cited file '{fpath}' not found in retrieved context.")
+                errors.append(f"Answer cited ungrounded file path: '{fpath}'")
 
         is_valid = len(errors) == 0
         return is_valid, errors

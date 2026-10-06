@@ -34,4 +34,8 @@ def test_query_analyzer_candidate_extraction():
     res = analyzer.analyze("Explain how UserService interacts with /api/users.py")
 
     assert "UserService" in res.candidate_symbols
-    assert "api/users.py" in res.candidate_files or "/api/users.py" in res.candidate_files or "users.py" in res.candidate_files
+    assert (
+        "api/users.py" in res.candidate_files
+        or "/api/users.py" in res.candidate_files
+        or "users.py" in res.candidate_files
+    )

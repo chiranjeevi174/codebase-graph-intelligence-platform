@@ -9,11 +9,7 @@ from app.diff.diff_models import (
     ChangeClassification,
     ChangeImpact,
     ChangeImpactResult,
-    ChangeType,
-    ContractChange,
     DiffRequest,
-    FileChange,
-    RelationshipChange,
     StructuralDiff,
     SymbolChange,
 )
@@ -48,10 +44,12 @@ class StructuralDiffAnalyzer:
 
     def analyze_diff(self, request: DiffRequest) -> ChangeImpactResult:
         """Execute full structural Git diff and change impact analysis."""
-        logger.info(f"[StructuralDiffAnalyzer] diff_started for repo_path='{request.repo_path}', base_ref='{request.base_ref}', target_ref='{request.target_ref}'")
+        logger.info(
+            f"[StructuralDiffAnalyzer] diff_started for repo_path='{request.repo_path}', base_ref='{request.base_ref}', target_ref='{request.target_ref}'"
+        )
 
         git_svc = self.git_service or GitDiffService(repo_path=request.repo_path)
-        
+
         base_sha = git_svc.resolve_ref(request.base_ref)
         target_sha = git_svc.resolve_ref(request.target_ref)
 
@@ -80,9 +78,7 @@ class StructuralDiffAnalyzer:
         logger.info(f"[StructuralDiffAnalyzer] symbols_changed: {len(symbol_changes)}")
 
         # 4. Relationship-level diff
-        relationship_changes = self.relationship_diff_engine.diff_relationships(
-            snapshot_pairs=snapshot_pairs
-        )
+        relationship_changes = self.relationship_diff_engine.diff_relationships(snapshot_pairs=snapshot_pairs)
         logger.info(f"[StructuralDiffAnalyzer] relationships_changed: {len(relationship_changes)}")
 
         # 5. API-level diff & contract changes
@@ -130,7 +126,7 @@ class StructuralDiffAnalyzer:
             )
             try:
                 impact_res = self.impact_service.analyze_impact(impact_req)
-                
+
                 direct_deps = [n.qualified_name for n in impact_res.direct_dependents]
                 trans_deps = [n.qualified_name for n in impact_res.transitive_dependents]
                 direct_calls = [n.qualified_name for n in impact_res.direct_dependencies]
@@ -184,23 +180,28 @@ class StructuralDiffAnalyzer:
                 )
 
                 # Evidence collection
-                evidence_list.append({
-                    "symbol": sym_chg.qualified_name,
-                    "symbol_type": sym_chg.symbol_type,
-                    "file_path": sym_chg.file_path,
-                    "start_line": sym_chg.start_line,
-                    "end_line": sym_chg.end_line,
-                    "change_type": sym_chg.change_type.value,
-                    "dependents_count": len(direct_deps) + len(trans_deps),
-                    "signature_changed": bool(sym_chg.signature_change and sym_chg.signature_change.signature_changed),
-                })
-            except Exception as e:
+                evidence_list.append(
+                    {
+                        "symbol": sym_chg.qualified_name,
+                        "symbol_type": sym_chg.symbol_type,
+                        "file_path": sym_chg.file_path,
+                        "start_line": sym_chg.start_line,
+                        "end_line": sym_chg.end_line,
+                        "change_type": sym_chg.change_type.value,
+                        "dependents_count": len(direct_deps) + len(trans_deps),
+                        "signature_changed": bool(
+                            sym_chg.signature_change and sym_chg.signature_change.signature_changed
+                        ),
+                    }
+                )
+            except Exception as e:  # noqa: BLE001 # Per-symbol impact resolution resilience boundary
                 logger.warning(f"[StructuralDiffAnalyzer] Impact analysis failed for {sym_chg.qualified_name}: {e}")
 
         for ac in api_changes:
-            if ac.endpoint_removed or ac.path_changed or ac.method_changed:
-                if classification == ChangeClassification.STRUCTURAL_CHANGE.value:
-                    classification = ChangeClassification.POTENTIALLY_BREAKING.value
+            if (
+                ac.endpoint_removed or ac.path_changed or ac.method_changed
+            ) and classification == ChangeClassification.STRUCTURAL_CHANGE.value:
+                classification = ChangeClassification.POTENTIALLY_BREAKING.value
 
         logger.info("[StructuralDiffAnalyzer] impact_analysis_completed")
 
@@ -220,9 +221,9 @@ class StructuralDiffAnalyzer:
             target_ref=request.target_ref,
             structural_diff=struct_diff,
             impact=impact_list,
-            affected_files=sorted(list(all_affected_files)),
-            affected_api_endpoints=sorted(list(all_affected_endpoints)),
-            affected_api_clients=sorted(list(all_affected_clients)),
+            affected_files=sorted(all_affected_files),
+            affected_api_endpoints=sorted(all_affected_endpoints),
+            affected_api_clients=sorted(all_affected_clients),
             classification=classification,
             explanation=explanation,
             evidence=evidence_list,
@@ -264,7 +265,7 @@ INSTRUCTIONS:
         try:
             llm = get_llm()
             return llm.generate(prompt)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 # LLM explanation fallback boundary
             logger.warning(f"[StructuralDiffAnalyzer] LLM explanation fallback: {e}")
             return (
                 f"Static graph analysis identifies {len(struct_diff.symbols_changed)} changed symbols and "
@@ -275,19 +276,29 @@ INSTRUCTIONS:
     def _format_symbols_summary(self, symbols: list[SymbolChange]) -> str:
         lines = []
         for s in symbols[:15]:
-            sig_str = f" Signature changed: {s.signature_change.old_signature} -> {s.signature_change.new_signature}" if s.signature_change and s.signature_change.signature_changed else ""
-            lines.append(f"- [{s.change_type.value}] {s.symbol_type} {s.qualified_name} in {s.file_path}:{s.start_line}-{s.end_line}{sig_str}")
+            sig_str = (
+                f" Signature changed: {s.signature_change.old_signature} -> {s.signature_change.new_signature}"
+                if s.signature_change and s.signature_change.signature_changed
+                else ""
+            )
+            lines.append(
+                f"- [{s.change_type.value}] {s.symbol_type} {s.qualified_name} in {s.file_path}:{s.start_line}-{s.end_line}{sig_str}"
+            )
         return "\n".join(lines) if lines else "No symbol changes detected."
 
     def _format_api_summary(self, api_changes: list[ApiChange]) -> str:
         lines = []
         for a in api_changes[:10]:
-            lines.append(f"- [{a.change_type.value}] Endpoint {a.http_method} {a.path} (old: {a.old_http_method or ''} {a.old_path or ''})")
+            lines.append(
+                f"- [{a.change_type.value}] Endpoint {a.http_method} {a.path} (old: {a.old_http_method or ''} {a.old_path or ''})"
+            )
         return "\n".join(lines) if lines else "No API changes detected."
 
     def _format_impact_summary(self, impacts: list[ChangeImpact]) -> str:
         lines = []
         for imp in impacts[:10]:
             deps_count = len(imp.direct_dependents) + len(imp.transitive_dependents)
-            lines.append(f"- Symbol '{imp.changed_symbol}': {deps_count} dependent symbols, {len(imp.affected_files)} affected files, {len(imp.affected_api_clients)} client references.")
+            lines.append(
+                f"- Symbol '{imp.changed_symbol}': {deps_count} dependent symbols, {len(imp.affected_files)} affected files, {len(imp.affected_api_clients)} client references."
+            )
         return "\n".join(lines) if lines else "No graph impact recorded."

@@ -304,6 +304,3 @@ class GraphQueryManager:
                 unique_paths.append(p)
 
         return unique_paths
-
-
-

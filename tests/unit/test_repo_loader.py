@@ -31,5 +31,7 @@ def test_repository_loader_enumeration():
         assert repo_info.total_files == 3
         assert "main.py" in rel_paths
         assert "utils.py" in rel_paths
-        assert "module/helper.py" in rel_paths or "module\\helper.py" in [f.relative_path.replace("/", "\\") for f in files]
+        assert "module/helper.py" in rel_paths or "module\\helper.py" in [
+            f.relative_path.replace("/", "\\") for f in files
+        ]
         assert "ignored.py" not in rel_paths

@@ -16,7 +16,9 @@ def main():
     parser = argparse.ArgumentParser(description="Analyze structural Git diff and static change impact.")
     parser.add_argument("--repo", type=str, default=".", help="Path to Git repository root")
     parser.add_argument("--base", type=str, required=True, help="Base Git ref (e.g. HEAD~1, main, commit SHA)")
-    parser.add_argument("--target", type=str, required=True, help="Target Git ref (e.g. HEAD, feature branch, commit SHA)")
+    parser.add_argument(
+        "--target", type=str, required=True, help="Target Git ref (e.g. HEAD, feature branch, commit SHA)"
+    )
     parser.add_argument("--repo-id", type=str, default="default", help="Repository identifier")
     parser.add_argument("--max-hops", type=int, default=3, help="Maximum graph traversal depth")
     parser.add_argument("--max-nodes", type=int, default=50, help="Maximum nodes in impact subgraph")

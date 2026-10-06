@@ -1,6 +1,5 @@
 """Repository Ingestion Service orchestrating full end-to-end repository indexing."""
 
-
 from app.embeddings.embedder import EmbeddingService
 from app.graph.graph_builder import GraphBuilder
 from app.ingestion.git_loader import LocalGitLoader
@@ -50,13 +49,15 @@ class RepositoryIngestionService:
             files_discovered=len(source_files),
         )
 
-        logger.info(f"[Ingestion Event: file_discovered] Discovered {len(source_files)} source files in repository '{repo_info.name}'")
+        logger.info(
+            f"[Ingestion Event: file_discovered] Discovered {len(source_files)} source files in repository '{repo_info.name}'"
+        )
 
         # Step 3: Create Repository Node in Neo4j
         try:
             self.graph_builder.create_repository_node(repo_info)
             result.graph_nodes_created += 1
-        except Exception as ge:
+        except Exception as ge:  # noqa: BLE001 — Ingestion root node graph boundary
             err_msg = f"Failed to create Repository root node in Neo4j: {ge}"
             logger.warning(err_msg)
             result.errors.append(err_msg)
@@ -71,7 +72,7 @@ class RepositoryIngestionService:
                 # Get parser for language
                 try:
                     parser = ParserFactory.get_parser(source_file.language)
-                except Exception as pe:
+                except Exception as pe:  # noqa: BLE001 — Safe parser resolution fallback
                     result.files_skipped += 1
                     logger.debug(f"Skipping file {source_file.relative_path}: {pe}")
                     continue
@@ -84,7 +85,9 @@ class RepositoryIngestionService:
                 extracted = parser.parse_file(source_file, content, repo_info.repository_id)
 
                 # Extract static API endpoints, client calls, contracts
-                eps, calls, contracts = self.api_extractor.extract_from_content(source_file, content, repo_info.repository_id)
+                eps, calls, contracts = self.api_extractor.extract_from_content(
+                    source_file, content, repo_info.repository_id
+                )
                 extracted.api_endpoints = eps
                 extracted.api_client_calls = calls
                 extracted.api_contracts = contracts
@@ -104,8 +107,12 @@ class RepositoryIngestionService:
                 result.relationships_extracted += rel_count
                 result.chunks_created += chunk_count
 
-                logger.info(f"[Ingestion Event: symbols_extracted] Extracted {sym_count} symbols and {api_node_count} API entities from {source_file.relative_path}")
-                logger.info(f"[Ingestion Event: relationships_extracted] Extracted {rel_count} relationships from {source_file.relative_path}")
+                logger.info(
+                    f"[Ingestion Event: symbols_extracted] Extracted {sym_count} symbols and {api_node_count} API entities from {source_file.relative_path}"
+                )
+                logger.info(
+                    f"[Ingestion Event: relationships_extracted] Extracted {rel_count} relationships from {source_file.relative_path}"
+                )
 
                 # Step 7 & 8: Neo4j Graph Construction
                 try:
@@ -113,8 +120,10 @@ class RepositoryIngestionService:
                     # File node + symbol nodes + API nodes
                     result.graph_nodes_created += 1 + sym_count + api_node_count
                     result.graph_relationships_created += rel_count
-                    logger.info(f"[Ingestion Event: graph_upsert_completed] Updated Neo4j graph for {source_file.relative_path}")
-                except Exception as ge:
+                    logger.info(
+                        f"[Ingestion Event: graph_upsert_completed] Updated Neo4j graph for {source_file.relative_path}"
+                    )
+                except Exception as ge:  # noqa: BLE001 — Per-file graph upsert resilience boundary
                     logger.warning(f"Neo4j ingestion warning for {source_file.relative_path}: {ge}")
                     result.errors.append(f"Graph error in {source_file.relative_path}: {ge}")
 
@@ -123,14 +132,16 @@ class RepositoryIngestionService:
                     try:
                         self.embedding_service.process_and_store_chunks(extracted.chunks)
                         result.vectors_created += chunk_count
-                        logger.info(f"[Ingestion Event: qdrant_upsert_completed] Upserted {chunk_count} vectors to Qdrant for {source_file.relative_path}")
-                    except Exception as qe:
+                        logger.info(
+                            f"[Ingestion Event: qdrant_upsert_completed] Upserted {chunk_count} vectors to Qdrant for {source_file.relative_path}"
+                        )
+                    except Exception as qe:  # noqa: BLE001 — Per-file vector store upsert resilience boundary
                         logger.warning(f"Qdrant vectorization warning for {source_file.relative_path}: {qe}")
                         result.errors.append(f"Vector error in {source_file.relative_path}: {qe}")
 
                 result.files_processed += 1
 
-            except Exception as fe:
+            except Exception as fe:  # noqa: BLE001 — Per-file ingestion isolation boundary
                 result.files_failed += 1
                 err_str = f"Error processing file {source_file.relative_path}: {fe}"
                 logger.error(err_str)
@@ -143,10 +154,14 @@ class RepositoryIngestionService:
                 matched_count = self.graph_builder.ingest_api_matches(api_matches)
                 result.graph_relationships_created += matched_count
                 result.relationships_extracted += len(api_matches)
-                logger.info(f"[Ingestion Event: api_matching_completed] Ingested {matched_count} cross-language API relationships into Neo4j graph")
-            except Exception as me:
+                logger.info(
+                    f"[Ingestion Event: api_matching_completed] Ingested {matched_count} cross-language API relationships into Neo4j graph"
+                )
+            except Exception as me:  # noqa: BLE001 — Cross-file API matching resilience boundary
                 logger.warning(f"API matching error: {me}")
                 result.errors.append(f"API matching error: {me}")
 
-        logger.info(f"[Ingestion Event: repository_ingestion_completed] Completed ingestion for '{repo_info.name}'. Processed: {result.files_processed}, Failed: {result.files_failed}")
+        logger.info(
+            f"[Ingestion Event: repository_ingestion_completed] Completed ingestion for '{repo_info.name}'. Processed: {result.files_processed}, Failed: {result.files_failed}"
+        )
         return result

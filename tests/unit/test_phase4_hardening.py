@@ -8,7 +8,6 @@ from app.config.settings import Settings
 from app.jobs.models import PRAnalysisJob, PRJobStatus
 from app.jobs.repository import JobRepository
 from app.parsing.go_parser import GoParser
-from app.parsing.python_parser import PythonASTParser
 
 
 @pytest.fixture

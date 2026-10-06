@@ -1,6 +1,7 @@
 """Unit tests for Phase 3.3-D PR automation hardening components."""
 
 import pytest
+
 from app.api.routes.webhooks import normalize_action
 from app.jobs.models import (
     PRAction,

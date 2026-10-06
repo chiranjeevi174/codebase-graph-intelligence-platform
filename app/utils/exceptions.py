@@ -1,7 +1,9 @@
 """Custom exception hierarchy for Codebase Graph Intelligence Platform."""
 
+
 class PlatformError(Exception):
     """Base exception class for all platform exceptions."""
+
     def __init__(self, message: str, details: dict | None = None):
         super().__init__(message)
         self.message = message

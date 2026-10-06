@@ -16,7 +16,10 @@ class SensitiveDataFilter(logging.Filter):
         if isinstance(record.args, tuple):
             record.args = tuple(self._sanitize(str(arg)) for arg in record.args)
         elif isinstance(record.args, dict):
-            record.args = {k: self._sanitize(str(v)) if any(s in k.lower() for s in self.SENSITIVE_PATTERNS) else v for k, v in record.args.items()}
+            record.args = {
+                k: self._sanitize(str(v)) if any(s in k.lower() for s in self.SENSITIVE_PATTERNS) else v
+                for k, v in record.args.items()
+            }
         return True
 
     def _sanitize(self, text: str) -> str:
@@ -30,6 +33,7 @@ class SensitiveDataFilter(logging.Filter):
 
 
 import json
+
 
 class JSONFormatter(logging.Formatter):
     """JSON log record formatter for production observability."""

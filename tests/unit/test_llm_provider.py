@@ -1,6 +1,7 @@
 """Unit tests for LLM provider abstraction and factory."""
 
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 
 from app.config.settings import Settings
@@ -41,7 +42,7 @@ def test_llm_factory_openai_provider():
     provider = LLMFactory.get_llm(provider="openai", settings=settings)
     assert isinstance(provider, OpenAIProvider)
     assert provider.provider_name == "openai"
-    assert provider.model_name == "gpt-4o-mini"
+    assert provider.model_name == "gpt-6-luna"
 
 
 def test_llm_factory_custom_registration():
@@ -90,5 +91,3 @@ async def test_openai_provider_agenerate(mock_async_openai_cls):
 
     assert result == "Async response text"
     mock_client.chat.completions.create.assert_called_once()
-
-

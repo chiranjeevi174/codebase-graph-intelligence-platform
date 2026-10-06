@@ -1,6 +1,5 @@
 """Repository ingestion endpoints delegating to RepositoryIngestionService."""
 
-
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
@@ -36,7 +35,9 @@ def ingest_repository(request: IngestRequest):
         if not any(r.repository_id == result.repository_id for r in _INGESTED_REPOS):
             _INGESTED_REPOS.append(result)
         return result
-    except Exception as e:
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001 # FastAPI 500 error boundary
         logger.error(f"Ingestion API error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 

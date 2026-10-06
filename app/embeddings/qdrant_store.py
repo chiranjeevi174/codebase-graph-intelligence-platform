@@ -24,7 +24,7 @@ class QdrantStore:
         if self._client is None:
             try:
                 self._client = QdrantClient(url=self.settings.QDRANT_URL)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 # Qdrant connection error translation
                 raise VectorStoreError(f"Failed to connect to Qdrant at {self.settings.QDRANT_URL}: {e}")
         return self._client
 
@@ -50,7 +50,7 @@ class QdrantStore:
                         field_name=field,
                         field_schema=rest_models.PayloadSchemaType.KEYWORD,
                     )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 # Qdrant collection management error translation
             raise VectorStoreError(f"Failed to ensure Qdrant collection '{self.collection_name}': {e}")
 
     def upsert_chunks(self, chunks: list[CodeChunk], embeddings: list[list[float]]):
@@ -90,8 +90,10 @@ class QdrantStore:
 
         try:
             client.upsert(collection_name=self.collection_name, points=points)
-            logger.info(f"Successfully upserted {len(points)} vector points to Qdrant collection '{self.collection_name}'.")
-        except Exception as e:
+            logger.info(
+                f"Successfully upserted {len(points)} vector points to Qdrant collection '{self.collection_name}'."
+            )
+        except Exception as e:  # noqa: BLE001 # Qdrant upsert error translation
             raise VectorStoreError(f"Failed to upsert points into Qdrant: {e}")
 
     def search_similar(
@@ -107,11 +109,17 @@ class QdrantStore:
 
         must_filters = []
         if repository_id:
-            must_filters.append(rest_models.FieldCondition(key="repository_id", match=rest_models.MatchValue(value=repository_id)))
+            must_filters.append(
+                rest_models.FieldCondition(key="repository_id", match=rest_models.MatchValue(value=repository_id))
+            )
         if file_path:
-            must_filters.append(rest_models.FieldCondition(key="file_path", match=rest_models.MatchValue(value=file_path)))
+            must_filters.append(
+                rest_models.FieldCondition(key="file_path", match=rest_models.MatchValue(value=file_path))
+            )
         if symbol_type:
-            must_filters.append(rest_models.FieldCondition(key="symbol_type", match=rest_models.MatchValue(value=symbol_type)))
+            must_filters.append(
+                rest_models.FieldCondition(key="symbol_type", match=rest_models.MatchValue(value=symbol_type))
+            )
 
         query_filter = rest_models.Filter(must=must_filters) if must_filters else None
 
@@ -131,5 +139,5 @@ class QdrantStore:
                 }
                 for hit in hits
             ]
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 # Qdrant search query error translation
             raise VectorStoreError(f"Vector search failed in Qdrant: {e}")

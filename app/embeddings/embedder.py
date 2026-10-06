@@ -1,6 +1,5 @@
 """Embedding service orchestrating document vectorization and Qdrant ingestion."""
 
-
 from app.embeddings.model import BaseEmbedder, HuggingFaceEmbedder
 from app.embeddings.qdrant_store import QdrantStore
 from app.models.entities import CodeChunk

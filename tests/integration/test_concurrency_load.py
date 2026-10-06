@@ -1,6 +1,7 @@
 """Integration load test verifying bounded concurrent PR analysis job submission and worker execution."""
 
 import asyncio
+
 import pytest
 from fastapi.testclient import TestClient
 

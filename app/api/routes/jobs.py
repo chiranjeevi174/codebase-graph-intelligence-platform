@@ -1,13 +1,12 @@
 """Async PR Analysis Job status, result, events, and listing API routes."""
 
 import asyncio
-import json
+
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
 from app.jobs.models import PRAnalysisJob, PRJobStatus
 from app.jobs.service import JobService
-from app.pr.models import PRAnalysisResult
 
 router = APIRouter(prefix="/jobs", tags=["Jobs"])
 
@@ -51,7 +50,12 @@ async def job_events_stream(job_id: str):
             payload = current_job.model_dump_json()
             yield f"data: {payload}\n\n"
 
-            if current_job.status in (PRJobStatus.COMPLETED, PRJobStatus.FAILED, PRJobStatus.DEAD_LETTER, PRJobStatus.CANCELLED):
+            if current_job.status in (
+                PRJobStatus.COMPLETED,
+                PRJobStatus.FAILED,
+                PRJobStatus.DEAD_LETTER,
+                PRJobStatus.CANCELLED,
+            ):
                 break
 
             await asyncio.sleep(1.0)
@@ -95,7 +99,9 @@ async def retry_job(job_id: str):
     service = JobService()
     try:
         return await service.retry_job(job_id)
+    except HTTPException:
+        raise
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 # FastAPI 500 error boundary
         raise HTTPException(status_code=500, detail=f"Failed to retry job: {e}")

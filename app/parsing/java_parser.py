@@ -125,7 +125,9 @@ class JavaParser(TreeSitterBaseParser):
                             )
 
                     # Implements
-                    interfaces_node = node.child_by_field_name("interfaces") or node.child_by_field_name("super_interfaces")
+                    interfaces_node = node.child_by_field_name("interfaces") or node.child_by_field_name(
+                        "super_interfaces"
+                    )
                     if interfaces_node:
                         impl_text = self._node_text(interfaces_node, content_bytes).replace("implements", "").strip()
                         for impl in impl_text.split(","):
@@ -167,7 +169,11 @@ class JavaParser(TreeSitterBaseParser):
                                     params = []
                                     params_node = member.child_by_field_name("parameters")
                                     if params_node:
-                                        params = [self._node_text(p, content_bytes) for p in params_node.children if p.type == "formal_parameter"]
+                                        params = [
+                                            self._node_text(p, content_bytes)
+                                            for p in params_node.children
+                                            if p.type == "formal_parameter"
+                                        ]
 
                                     method_sym = MethodInfo(
                                         symbol_id=generate_symbol_id(repository_id, file_path, m_qn),

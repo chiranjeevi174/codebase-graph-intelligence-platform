@@ -1,6 +1,5 @@
 """Code Impact Analysis Engine service layer."""
 
-
 from app.graph.graph_queries import GraphQueryManager
 from app.llm.factory import get_llm
 from app.models.entities import (
@@ -32,7 +31,9 @@ class CodeImpactAnalysisService:
 
     def analyze_impact(self, request: ImpactAnalysisRequest) -> ImpactAnalysisResult:
         """Perform static impact analysis around a target code symbol."""
-        logger.info(f"[ImpactAnalysisService] Starting impact analysis for symbol: '{request.symbol}' (max_hops={request.max_hops})")
+        logger.info(
+            f"[ImpactAnalysisService] Starting impact analysis for symbol: '{request.symbol}' (max_hops={request.max_hops})"
+        )
 
         # 1. Target Symbol Resolution
         resolved_list = self.entity_resolver.resolve(
@@ -125,9 +126,10 @@ class CodeImpactAnalysisService:
 
             if hop == 1:
                 direct_dependents_map[qn] = node
-            elif qn not in direct_dependents_map:
-                if qn not in transitive_dependents_map or hop < transitive_dependents_map[qn].hop_count:
-                    transitive_dependents_map[qn] = node
+            elif qn not in direct_dependents_map and (
+                qn not in transitive_dependents_map or hop < transitive_dependents_map[qn].hop_count
+            ):
+                transitive_dependents_map[qn] = node
 
             # Build ImpactPath
             path_nodes = rec.get("path_nodes") or [qn, target_qn]
@@ -184,9 +186,10 @@ class CodeImpactAnalysisService:
 
             if hop == 1:
                 direct_dependencies_map[qn] = node
-            elif qn not in direct_dependencies_map:
-                if qn not in transitive_dependencies_map or hop < transitive_dependencies_map[qn].hop_count:
-                    transitive_dependencies_map[qn] = node
+            elif qn not in direct_dependencies_map and (
+                qn not in transitive_dependencies_map or hop < transitive_dependencies_map[qn].hop_count
+            ):
+                transitive_dependencies_map[qn] = node
 
         # Remove any direct dependencies from transitive map
         for direct_qn in direct_dependencies_map:
@@ -233,7 +236,7 @@ class CodeImpactAnalysisService:
             transitive_dependencies=transitive_dependencies,
             transitive_dependents=transitive_dependents,
             impact_paths=impact_paths[:15],
-            affected_files=sorted(list(affected_files_set)),
+            affected_files=sorted(affected_files_set),
             evidence_snippets=evidence_snippets,
             explanation=explanation,
             analysis_truncated=truncated,
@@ -263,21 +266,37 @@ class CodeImpactAnalysisService:
             "5. State any uncertainty if static analysis cannot fully determine runtime behavior."
         )
 
-        deps_summary = "\n".join(
-            [f"- {d.name} ({d.symbol_type}) in `{d.file_path}:{d.start_line or 1}` [{d.relationship_type}]" for d in direct_dependents[:10]]
-        ) or "None observed."
+        deps_summary = (
+            "\n".join(
+                [
+                    f"- {d.name} ({d.symbol_type}) in `{d.file_path}:{d.start_line or 1}` [{d.relationship_type}]"
+                    for d in direct_dependents[:10]
+                ]
+            )
+            or "None observed."
+        )
 
-        trans_summary = "\n".join(
-            [f"- {t.name} ({t.symbol_type}) in `{t.file_path}:{t.start_line or 1}` [{t.hop_count} hops away]" for t in transitive_dependents[:10]]
-        ) or "None observed."
+        trans_summary = (
+            "\n".join(
+                [
+                    f"- {t.name} ({t.symbol_type}) in `{t.file_path}:{t.start_line or 1}` [{t.hop_count} hops away]"
+                    for t in transitive_dependents[:10]
+                ]
+            )
+            or "None observed."
+        )
 
-        downstream_summary = "\n".join(
-            [f"- {d.name} ({d.symbol_type}) in `{d.file_path}:{d.start_line or 1}` [{d.relationship_type}]" for d in direct_dependencies[:10]]
-        ) or "None observed."
+        downstream_summary = (
+            "\n".join(
+                [
+                    f"- {d.name} ({d.symbol_type}) in `{d.file_path}:{d.start_line or 1}` [{d.relationship_type}]"
+                    for d in direct_dependencies[:10]
+                ]
+            )
+            or "None observed."
+        )
 
-        paths_summary = "\n".join(
-            [f"- {' -> '.join(p.path_sequence)}" for p in impact_paths[:5]]
-        ) or "None."
+        paths_summary = "\n".join([f"- {' -> '.join(p.path_sequence)}" for p in impact_paths[:5]]) or "None."
 
         prompt = f"""Target Symbol Analyzed: `{target.qualified_name}` (File: `{target.file_path}:{target.start_line or 1}-{target.end_line or 1}`)
 
@@ -306,7 +325,7 @@ Explain the structural impact of modifying `{target.name}` grounded in these sta
 
         try:
             explanation = llm.generate(prompt=prompt, system_prompt=system_prompt, temperature=0.2)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 # LLM explanation generation fallback
             logger.error(f"Error generating impact explanation via LLM: {e}")
             explanation = (
                 f"Static analysis identifies {summary.direct_dependents_count} direct dependents and "

@@ -77,9 +77,7 @@ def test_multilanguage_repository_ingestion():
         if not next_offset:
             break
 
-    payload_languages = {
-        p.payload.get("language") for p in all_points if p.payload and p.payload.get("language")
-    }
+    payload_languages = {p.payload.get("language") for p in all_points if p.payload and p.payload.get("language")}
 
     assert "python" in payload_languages
     assert "javascript" in payload_languages

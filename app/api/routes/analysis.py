@@ -9,6 +9,7 @@ router = APIRouter(tags=["Analysis"])
 
 
 from typing import Any
+
 from pydantic import BaseModel, Field
 
 from app.graph.graph_queries import GraphQueryManager
@@ -33,7 +34,9 @@ def analyze_code_impact(request: ImpactAnalysisRequest):
         service = CodeImpactAnalysisService()
         result = service.analyze_impact(request)
         return result
-    except Exception as e:
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001 # FastAPI 500 error boundary
         raise HTTPException(status_code=500, detail=f"Code impact analysis failed: {e}")
 
 
@@ -52,7 +55,9 @@ def analyze_api_flow(request: ApiFlowAnalysisRequest):
             paths_found=len(raw_paths),
             paths=raw_paths,
         )
-    except Exception as e:
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001 # FastAPI 500 error boundary
         raise HTTPException(status_code=500, detail=f"API flow analysis failed: {e}")
 
 
@@ -67,16 +72,18 @@ def analyze_structural_diff(request: DiffRequest):
         analyzer = StructuralDiffAnalyzer()
         result = analyzer.analyze_diff(request)
         return result
-    except Exception as e:
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001 # FastAPI 500 error boundary
         raise HTTPException(status_code=500, detail=f"Structural diff analysis failed: {e}")
 
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Query, status
 from fastapi.responses import JSONResponse
 
 from app.jobs.models import PRJobRequest
 from app.jobs.service import JobService
-from app.pr.models import PRAnalysisRequest, PRAnalysisResult
+from app.pr.models import PRAnalysisRequest
 from app.pr.service import PRAnalysisService
 
 
@@ -109,7 +116,9 @@ async def analyze_pull_request(
             status_code=status.HTTP_202_ACCEPTED,
             content=job.model_dump(mode="json"),
         )
-    except Exception as e:
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001 # FastAPI 500 error boundary
         raise HTTPException(status_code=500, detail=f"PR analysis failed: {e}")
 
 
@@ -128,8 +137,7 @@ def get_pr_analysis_history(
     try:
         repo_db = JobRepository()
         return repo_db.get_pr_history(provider=provider, repository=repository, pr_number=pr_number, limit=limit)
-    except Exception as e:
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001 # FastAPI 500 error boundary
         raise HTTPException(status_code=500, detail=f"Failed to fetch PR history: {e}")
-
-
-

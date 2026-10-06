@@ -34,5 +34,7 @@ def execute_query(request: QueryRequest):
             debug=request.debug,
         )
         return response
-    except Exception as e:
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001 # FastAPI 500 error boundary
         raise HTTPException(status_code=500, detail=f"Graph RAG query execution failed: {e}")

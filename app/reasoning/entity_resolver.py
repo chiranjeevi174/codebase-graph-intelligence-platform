@@ -1,6 +1,5 @@
 """Entity Resolver for matching candidate query terms against graph nodes and vector store."""
 
-
 from app.graph.graph_queries import GraphQueryManager
 from app.models.entities import ResolvedEntity
 from app.utils.logger import logger
@@ -104,8 +103,10 @@ class EntityResolver:
                                     confidence=0.8,
                                 )
                             )
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — Safe entity resolution per-term fallback
                 logger.warning(f"Error resolving entity '{term}': {e}")
 
-        logger.info(f"[EntityResolver] Resolved {len(resolved_entities)} entities from {len(candidate_symbols)} candidates.")
+        logger.info(
+            f"[EntityResolver] Resolved {len(resolved_entities)} entities from {len(candidate_symbols)} candidates."
+        )
         return resolved_entities

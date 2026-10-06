@@ -1,7 +1,7 @@
 """GitHub PR Provider implementation handling webhook signature verification and API calls."""
 
-import hmac
 import hashlib
+import hmac
 from typing import Any
 
 from app.config.settings import Settings, get_settings
@@ -31,11 +31,7 @@ class GitHubProvider(PRProvider):
             logger.warning("[GitHubProvider] Missing or invalid X-Hub-Signature-256 header.")
             return False
 
-        expected_sig = "sha256=" + hmac.new(
-            secret.encode("utf-8"),
-            payload_bytes,
-            hashlib.sha256
-        ).hexdigest()
+        expected_sig = "sha256=" + hmac.new(secret.encode("utf-8"), payload_bytes, hashlib.sha256).hexdigest()
 
         return hmac.compare_digest(expected_sig, signature_header)
 
@@ -93,7 +89,9 @@ class GitHubProvider(PRProvider):
             action="synchronize",
         )
 
-    def find_existing_comment_id(self, repository: str, pr_number: int, marker: str = "<!-- codebase-graph-intelligence-platform -->") -> str | None:
+    def find_existing_comment_id(
+        self, repository: str, pr_number: int, marker: str = "<!-- codebase-graph-intelligence-platform -->"
+    ) -> str | None:
         """Search PR issue comments for existing marker tag."""
         # Simulated/API hook: return None if none found
         return None

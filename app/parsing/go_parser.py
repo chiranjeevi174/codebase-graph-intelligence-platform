@@ -79,7 +79,9 @@ class GoParser(TreeSitterBaseParser):
                         type_qn = f"{package_name}.{type_name}"
                         start_line, end_line = self._line_range(spec)
 
-                        type_node = spec.child_by_field_name("type") or (spec.children[1] if len(spec.children) > 1 else None)
+                        type_node = spec.child_by_field_name("type") or (
+                            spec.children[1] if len(spec.children) > 1 else None
+                        )
                         if type_node:
                             if type_node.type == "struct_type":
                                 struct_sym = ClassInfo(
@@ -141,7 +143,10 @@ class GoParser(TreeSitterBaseParser):
                         class_name=receiver_type or package_name,
                     )
                     symbols.append(method_sym)
-                    walk(node.child_by_field_name("body") or node, scope + ([receiver_type, m_name] if receiver_type else [m_name]))
+                    walk(
+                        node.child_by_field_name("body") or node,
+                        scope + ([receiver_type, m_name] if receiver_type else [m_name]),
+                    )
                     return
 
             # 4. Top-level Functions

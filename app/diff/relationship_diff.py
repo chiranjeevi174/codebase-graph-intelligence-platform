@@ -29,14 +29,14 @@ class RelationshipDiffEngine:
                     callee = call.callee_qualified_name or call.callee_name
                     key = ("CALLS", call.caller_qualified_name, callee)
                     base_rels.add(key)
-                    base_rel_meta[key] = dict(call.model_dump() if hasattr(call, 'model_dump') else call.__dict__)
+                    base_rel_meta[key] = dict(call.model_dump() if hasattr(call, "model_dump") else call.__dict__)
 
                 # Imports
                 for imp in base_data.imports:
                     target_sym = imp.imported_symbol or imp.module_name
                     key = ("IMPORTS", imp.file_path, target_sym)
                     base_rels.add(key)
-                    base_rel_meta[key] = dict(imp.model_dump() if hasattr(imp, 'model_dump') else imp.__dict__)
+                    base_rel_meta[key] = dict(imp.model_dump() if hasattr(imp, "model_dump") else imp.__dict__)
 
                 # Inheritance
                 for inh in base_data.inheritance:
@@ -44,7 +44,7 @@ class RelationshipDiffEngine:
                     rel_t = inh.relationship_type or "INHERITS"
                     key = (rel_t, inh.child_qualified_name, parent)
                     base_rels.add(key)
-                    base_rel_meta[key] = dict(inh.model_dump() if hasattr(inh, 'model_dump') else inh.__dict__)
+                    base_rel_meta[key] = dict(inh.model_dump() if hasattr(inh, "model_dump") else inh.__dict__)
 
             if target_data:
                 # Calls
@@ -52,14 +52,14 @@ class RelationshipDiffEngine:
                     callee = call.callee_qualified_name or call.callee_name
                     key = ("CALLS", call.caller_qualified_name, callee)
                     target_rels.add(key)
-                    target_rel_meta[key] = dict(call.model_dump() if hasattr(call, 'model_dump') else call.__dict__)
+                    target_rel_meta[key] = dict(call.model_dump() if hasattr(call, "model_dump") else call.__dict__)
 
                 # Imports
                 for imp in target_data.imports:
                     target_sym = imp.imported_symbol or imp.module_name
                     key = ("IMPORTS", imp.file_path, target_sym)
                     target_rels.add(key)
-                    target_rel_meta[key] = dict(imp.model_dump() if hasattr(imp, 'model_dump') else imp.__dict__)
+                    target_rel_meta[key] = dict(imp.model_dump() if hasattr(imp, "model_dump") else imp.__dict__)
 
                 # Inheritance
                 for inh in target_data.inheritance:
@@ -67,7 +67,7 @@ class RelationshipDiffEngine:
                     rel_t = inh.relationship_type or "INHERITS"
                     key = (rel_t, inh.child_qualified_name, parent)
                     target_rels.add(key)
-                    target_rel_meta[key] = dict(inh.model_dump() if hasattr(inh, 'model_dump') else inh.__dict__)
+                    target_rel_meta[key] = dict(inh.model_dump() if hasattr(inh, "model_dump") else inh.__dict__)
 
             # Added relationships
             for key in target_rels - base_rels:

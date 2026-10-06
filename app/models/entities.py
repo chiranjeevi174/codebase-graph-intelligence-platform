@@ -65,6 +65,7 @@ class IngestionResult(BaseModel):
 
 class SourceFile(BaseModel):
     """Metadata representing a single source code file."""
+
     file_path: str = Field(..., description="Absolute or repo-relative path to the file")
     relative_path: str = Field(..., description="Relative path from repository root")
     language: str = Field(..., description="Programming language identifier (e.g. python)")
@@ -75,6 +76,7 @@ class SourceFile(BaseModel):
 
 class CodeSymbol(BaseModel):
     """Base model for any code entity/symbol extracted from source code."""
+
     symbol_id: str = Field(..., description="Unique deterministic identifier for node identity")
     symbol_name: str = Field(..., description="Name of the symbol")
     symbol_type: SymbolType = Field(..., description="Entity type classification")
@@ -88,6 +90,7 @@ class CodeSymbol(BaseModel):
 
 class ClassInfo(CodeSymbol):
     """Model representing a class definition."""
+
     symbol_type: SymbolType = SymbolType.CLASS
     base_classes: list[str] = Field(default_factory=list, description="List of superclass names")
     methods: list[str] = Field(default_factory=list, description="Qualified names of methods defined in class")
@@ -96,6 +99,7 @@ class ClassInfo(CodeSymbol):
 
 class FunctionInfo(CodeSymbol):
     """Model representing a top-level function definition."""
+
     symbol_type: SymbolType = SymbolType.FUNCTION
     parameters: list[str] = Field(default_factory=list, description="Function parameters")
     return_type: str | None = Field(default=None, description="Annotated return type")
@@ -105,6 +109,7 @@ class FunctionInfo(CodeSymbol):
 
 class MethodInfo(CodeSymbol):
     """Model representing a class method definition."""
+
     symbol_type: SymbolType = SymbolType.METHOD
     class_name: str = Field(..., description="Name or qualified name of enclosing class")
     parameters: list[str] = Field(default_factory=list, description="Method parameters")
@@ -117,6 +122,7 @@ class MethodInfo(CodeSymbol):
 
 class ImportInfo(BaseModel):
     """Model representing an import statement."""
+
     file_path: str = Field(..., description="Source file containing import")
     module_name: str = Field(..., description="Module being imported")
     imported_symbol: str | None = Field(default=None, description="Specific symbol imported (from X import Y)")
@@ -126,6 +132,7 @@ class ImportInfo(BaseModel):
 
 class CallRelation(BaseModel):
     """Model representing a function or method invocation."""
+
     caller_qualified_name: str = Field(..., description="Qualified name of calling entity")
     callee_name: str = Field(..., description="Name of function/method being called")
     callee_qualified_name: str | None = Field(default=None, description="Resolved qualified name of callee if known")
@@ -135,15 +142,19 @@ class CallRelation(BaseModel):
 
 class InheritanceRelation(BaseModel):
     """Model representing an inheritance or interface implementation relationship."""
+
     child_qualified_name: str = Field(..., description="Qualified name of subclass/implementation")
     parent_name: str = Field(..., description="Name of base class/interface")
-    parent_qualified_name: str | None = Field(default=None, description="Resolved qualified name of parent class if known")
+    parent_qualified_name: str | None = Field(
+        default=None, description="Resolved qualified name of parent class if known"
+    )
     file_path: str = Field(..., description="File path containing child definition")
     relationship_type: str = Field(default="INHERITS", description="Relationship type: INHERITS or IMPLEMENTS")
 
 
 class CodeChunk(BaseModel):
     """Model representing a semantic code snippet for embedding & Qdrant storage."""
+
     chunk_id: str = Field(..., description="Unique hash/id for vector point")
     repository_id: str = Field(..., description="Repository identifier")
     file_path: str = Field(..., description="File path relative to repo root")
@@ -394,5 +405,3 @@ class ImpactAnalysisResult(BaseModel):
     evidence_snippets: list[NormalizedSearchResult] = Field(default_factory=list)
     explanation: str
     analysis_truncated: bool = False
-
-

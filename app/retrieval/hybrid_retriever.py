@@ -99,14 +99,28 @@ class HybridRetriever:
                 records.extend(self.graph_query_manager.find_dependencies(entity.qualified_name))
             if intent == "impact":
                 records.extend(self.graph_query_manager.find_impact_subgraph(entity.qualified_name, max_depth=max_hops))
-            
+
             # Direct symbol details if few records found
             records.extend(self.graph_query_manager.find_symbol(entity.qualified_name))
 
             for rec in records:
                 # Normalize graph records into NormalizedSearchResult
-                name = rec.get("caller_name") or rec.get("callee_name") or rec.get("target_name") or rec.get("source_name") or rec.get("name") or entity.name
-                qn = rec.get("caller_qn") or rec.get("callee_qn") or rec.get("target_qn") or rec.get("source_qn") or rec.get("qualified_name") or entity.qualified_name
+                name = (
+                    rec.get("caller_name")
+                    or rec.get("callee_name")
+                    or rec.get("target_name")
+                    or rec.get("source_name")
+                    or rec.get("name")
+                    or entity.name
+                )
+                qn = (
+                    rec.get("caller_qn")
+                    or rec.get("callee_qn")
+                    or rec.get("target_qn")
+                    or rec.get("source_qn")
+                    or rec.get("qualified_name")
+                    or entity.qualified_name
+                )
                 fpath = rec.get("file_path") or entity.file_path
                 start_l = int(rec.get("start_line") or entity.start_line or 1)
                 end_l = int(rec.get("end_line") or entity.end_line or start_l)

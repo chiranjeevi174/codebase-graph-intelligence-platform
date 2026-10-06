@@ -54,5 +54,5 @@ def test_go_parser_extraction():
     assert data.imports[0].module_name == "fmt"
 
     # Check method qualified name with receiver
-    method_sym = [s for s in data.symbols if s.symbol_name == "CreateUser"][0]
+    method_sym = next(s for s in data.symbols if s.symbol_name == "CreateUser")
     assert method_sym.qualified_name == "service.UserStruct.CreateUser"

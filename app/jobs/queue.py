@@ -1,7 +1,6 @@
 """Async PR Job Queue interface using ARQ / Redis with in-memory fallback."""
 
 import asyncio
-from typing import Any
 
 from app.config.settings import Settings, get_settings
 from app.jobs.models import PRAnalysisJob
@@ -29,9 +28,10 @@ class PRJobQueue:
                 await arq_pool.close()
             logger.info(f"[PRJobQueue:job_queued] Enqueued job '{job.job_id}' to ARQ Redis queue.")
             return True
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — ARQ Redis queue connection & fallback boundary
             logger.warning(f"[PRJobQueue] Redis/ARQ enqueue warning: {e}. Executing via fallback task.")
             # Execute in background asyncio task for non-blocking local runs
             from app.jobs.worker import execute_pr_job_direct
+
             asyncio.create_task(execute_pr_job_direct(job.job_id))
             return True

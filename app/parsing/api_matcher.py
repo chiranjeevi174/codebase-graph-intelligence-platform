@@ -47,14 +47,20 @@ class APIMatcher:
                             line_number=call.start_line,
                         )
                         matches.append(match_obj)
-                        logger.info(f"[api_match_created] Matched client call {call.http_method} {call.url} -> {ep.http_method} {ep.path} ({reason})")
+                        logger.info(
+                            f"[api_match_created] Matched client call {call.http_method} {call.url} -> {ep.http_method} {ep.path} ({reason})"
+                        )
                         if call.language != ep.language:
-                            logger.info(f"[cross_language_link_created] Linked cross-language API relation between {call.language} ({call.file_path}) and {ep.language} ({ep.file_path})")
+                            logger.info(
+                                f"[cross_language_link_created] Linked cross-language API relation between {call.language} ({call.file_path}) and {ep.language} ({ep.file_path})"
+                            )
 
         # Log unresolved client calls
         for call in client_calls:
             if call.call_id not in matched_call_ids:
-                logger.info(f"[api_match_unresolved] Unresolved client call {call.http_method} {call.url} in {call.file_path}:{call.start_line}")
+                logger.info(
+                    f"[api_match_unresolved] Unresolved client call {call.http_method} {call.url} in {call.file_path}:{call.start_line}"
+                )
 
         # 2. Match ApiEndpoint -> ApiContract
         for ep in endpoints:
@@ -79,7 +85,9 @@ class APIMatcher:
                                 line_number=ep.start_line,
                             )
                         )
-                        logger.info(f"[api_match_created] Matched endpoint {ep.qualified_name} -> contract {c.path_template} (IMPLEMENTS_CONTRACT)")
+                        logger.info(
+                            f"[api_match_created] Matched endpoint {ep.qualified_name} -> contract {c.path_template} (IMPLEMENTS_CONTRACT)"
+                        )
 
         # 3. Match ApiClientCall -> ApiContract
         for call in client_calls:
@@ -104,6 +112,8 @@ class APIMatcher:
                                 line_number=call.start_line,
                             )
                         )
-                        logger.info(f"[api_match_created] Matched client call {call.http_method} {call.url} -> contract {c.path_template} (MATCHES_CONTRACT)")
+                        logger.info(
+                            f"[api_match_created] Matched client call {call.http_method} {call.url} -> contract {c.path_template} (MATCHES_CONTRACT)"
+                        )
 
         return matches

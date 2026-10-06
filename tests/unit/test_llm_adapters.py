@@ -26,6 +26,3 @@ def test_to_openai_messages_unsupported_role():
     raw_messages = [{"role": "unsupported_role", "content": "test"}]
     with pytest.raises(ValueError, match="Unsupported message role for OpenAI provider"):
         to_openai_messages(raw_messages)
-
-
-

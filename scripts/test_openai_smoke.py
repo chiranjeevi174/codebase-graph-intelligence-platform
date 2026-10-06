@@ -5,8 +5,8 @@ Run with:
     uv run python scripts/test_openai_smoke.py
 """
 
-import sys
 import asyncio
+import sys
 from pathlib import Path
 
 # Add project root to sys.path
@@ -61,6 +61,6 @@ if __name__ == "__main__":
     try:
         success = run_openai_smoke_test()
         sys.exit(0 if success else 1)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — Top-level smoke test CLI exception handler
         print(f"[FAILED] OpenAI Smoke Test Failed: {e}")
         sys.exit(1)

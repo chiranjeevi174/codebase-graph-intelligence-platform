@@ -1,6 +1,5 @@
 """Reciprocal Rank Fusion (RRF) for combining Graph and Semantic retrieval results."""
 
-
 from app.models.entities import NormalizedSearchResult
 
 
@@ -65,8 +64,8 @@ class RRFComposer:
         fused: list[NormalizedSearchResult] = []
         for key, item in items.items():
             src_set = sources[key]
-            provenance = "both" if len(src_set) > 1 else list(src_set)[0]
-            
+            provenance = "both" if len(src_set) > 1 else next(iter(src_set))
+
             fused_item = item.model_copy(deep=True)
             fused_item.source = provenance
             fused_item.rrf_score = round(scores[key], 6)

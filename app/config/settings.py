@@ -61,7 +61,7 @@ class Settings(BaseSettings):
 
     # OpenAI Provider settings
     OPENAI_API_KEY: str = ""
-    OPENAI_MODEL: str = "gpt-4o-mini"
+    OPENAI_MODEL: str = "gpt-6-luna"
 
     # PR & Webhook Integration settings
     GITHUB_WEBHOOK_SECRET: str = ""

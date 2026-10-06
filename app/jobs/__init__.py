@@ -12,13 +12,13 @@ from app.jobs.service import JobService
 from app.jobs.worker import execute_pr_job_direct, perform_pr_analysis_job
 
 __all__ = [
-    "PRAnalysisJob",
-    "PRJobStatus",
-    "PRCommentStatus",
-    "PRJobRequest",
     "JobRepository",
-    "PRJobQueue",
     "JobService",
-    "perform_pr_analysis_job",
+    "PRAnalysisJob",
+    "PRCommentStatus",
+    "PRJobQueue",
+    "PRJobRequest",
+    "PRJobStatus",
     "execute_pr_job_direct",
+    "perform_pr_analysis_job",
 ]

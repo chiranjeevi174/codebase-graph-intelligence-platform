@@ -1,8 +1,6 @@
 """Latency tracker for measuring stage-by-stage execution times."""
 
 import statistics
-import time
-from typing import Any
 
 from app.evaluation.models import LatencyStats
 

@@ -1,9 +1,9 @@
 """Neo4j Database Client wrapper with connection pooling and query execution utilities."""
 
-from typing import Any, cast
-from typing_extensions import LiteralString
+from typing import Any, LiteralString, cast
 
 from neo4j import Driver, GraphDatabase
+from neo4j.exceptions import Neo4jError
 
 from app.config.settings import Settings, get_settings
 from app.graph.schema import CYPHER_CONSTRAINTS, CYPHER_INDEXES
@@ -28,7 +28,7 @@ class Neo4jClient:
                 )
                 self.verify_connectivity()
                 logger.info(f"Connected to Neo4j at {self.settings.NEO4J_URI}")
-            except Exception as e:
+            except (Neo4jError, Exception) as e:  # noqa: BLE001
                 self._driver = None
                 raise GraphDatabaseError(f"Failed to connect to Neo4j database: {e}")
 
@@ -53,7 +53,7 @@ class Neo4jClient:
         try:
             driver.verify_connectivity()
             return True
-        except Exception as e:
+        except (Neo4jError, Exception) as e:  # noqa: BLE001
             raise GraphDatabaseError(f"Neo4j connectivity check failed: {e}")
 
     def execute_write(self, query: str, parameters: dict[str, Any] | None = None) -> list[dict[str, Any]]:
@@ -64,7 +64,7 @@ class Neo4jClient:
                 cypher_query = cast(LiteralString, query)
                 result = session.execute_write(lambda tx: tx.run(cypher_query, parameters or {}).data())
                 return result
-        except Exception as e:
+        except (Neo4jError, Exception) as e:  # noqa: BLE001
             raise GraphDatabaseError(f"Cypher write execution failed: {e}. Query: {query}")
 
     def execute_read(self, query: str, parameters: dict[str, Any] | None = None) -> list[dict[str, Any]]:
@@ -75,7 +75,7 @@ class Neo4jClient:
                 cypher_query = cast(LiteralString, query)
                 result = session.execute_read(lambda tx: tx.run(cypher_query, parameters or {}).data())
                 return result
-        except Exception as e:
+        except (Neo4jError, Exception) as e:  # noqa: BLE001
             raise GraphDatabaseError(f"Cypher read execution failed: {e}. Query: {query}")
 
     def init_schema(self):
@@ -84,5 +84,5 @@ class Neo4jClient:
         for query in CYPHER_CONSTRAINTS + CYPHER_INDEXES:
             try:
                 self.execute_write(query)
-            except Exception as e:
+            except (Neo4jError, Exception) as e:  # noqa: BLE001
                 logger.warning(f"Error executing schema query: {e}")

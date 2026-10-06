@@ -2,6 +2,7 @@
 
 from enum import Enum
 from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -75,7 +76,9 @@ class SymbolChange(BaseModel):
     new_file_path: str | None = Field(default=None, description="New file path if changed")
     new_start_line: int | None = Field(default=None, description="Start line in target version")
     new_end_line: int | None = Field(default=None, description="End line in target version")
-    signature_change: SignatureChangeInfo | None = Field(default=None, description="Signature diff details if applicable")
+    signature_change: SignatureChangeInfo | None = Field(
+        default=None, description="Signature diff details if applicable"
+    )
     details: dict[str, Any] = Field(default_factory=dict, description="Additional properties changed")
 
 
@@ -128,7 +131,9 @@ class StructuralDiff(BaseModel):
     target_commit_hash: str = Field(default="", description="Resolved target commit SHA")
     files_changed: list[FileChange] = Field(default_factory=list, description="File-level changes")
     symbols_changed: list[SymbolChange] = Field(default_factory=list, description="Symbol-level changes")
-    relationships_changed: list[RelationshipChange] = Field(default_factory=list, description="Graph relationship changes")
+    relationships_changed: list[RelationshipChange] = Field(
+        default_factory=list, description="Graph relationship changes"
+    )
     api_changes: list[ApiChange] = Field(default_factory=list, description="API endpoint changes")
     contract_changes: list[ContractChange] = Field(default_factory=list, description="Contract file changes")
 
@@ -138,10 +143,18 @@ class ChangeImpact(BaseModel):
 
     changed_symbol: str = Field(..., description="Qualified name or ID of changed symbol")
     change_type: ChangeType = Field(..., description="Type of change")
-    direct_dependents: list[str] = Field(default_factory=list, description="Symbols directly calling/depending on changed symbol")
-    transitive_dependents: list[str] = Field(default_factory=list, description="Symbols transitively depending on changed symbol")
-    direct_dependencies: list[str] = Field(default_factory=list, description="Symbols directly called/used by changed symbol")
-    transitive_dependencies: list[str] = Field(default_factory=list, description="Symbols transitively used by changed symbol")
+    direct_dependents: list[str] = Field(
+        default_factory=list, description="Symbols directly calling/depending on changed symbol"
+    )
+    transitive_dependents: list[str] = Field(
+        default_factory=list, description="Symbols transitively depending on changed symbol"
+    )
+    direct_dependencies: list[str] = Field(
+        default_factory=list, description="Symbols directly called/used by changed symbol"
+    )
+    transitive_dependencies: list[str] = Field(
+        default_factory=list, description="Symbols transitively used by changed symbol"
+    )
     affected_files: list[str] = Field(default_factory=list, description="Source files containing affected components")
     affected_api_endpoints: list[str] = Field(default_factory=list, description="API endpoints affected")
     affected_api_clients: list[str] = Field(default_factory=list, description="Frontend or client call sites affected")
@@ -159,6 +172,12 @@ class ChangeImpactResult(BaseModel):
     affected_files: list[str] = Field(default_factory=list, description="All affected source file paths")
     affected_api_endpoints: list[str] = Field(default_factory=list, description="All affected API endpoint IDs")
     affected_api_clients: list[str] = Field(default_factory=list, description="All affected frontend/client call IDs")
-    classification: str = Field(default=ChangeClassification.STRUCTURAL_CHANGE.value, description="Breaking change risk level")
-    explanation: str | None = Field(default=None, description="LLM synthesis or structural summary of changes and impact")
-    evidence: list[dict[str, Any]] = Field(default_factory=list, description="Supporting evidence items and line references")
+    classification: str = Field(
+        default=ChangeClassification.STRUCTURAL_CHANGE.value, description="Breaking change risk level"
+    )
+    explanation: str | None = Field(
+        default=None, description="LLM synthesis or structural summary of changes and impact"
+    )
+    evidence: list[dict[str, Any]] = Field(
+        default_factory=list, description="Supporting evidence items and line references"
+    )

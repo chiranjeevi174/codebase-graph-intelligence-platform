@@ -37,8 +37,7 @@ class ApplicationMetricsRegistry:
     def get_summary(self) -> dict[str, Any]:
         avg_latency = round(self.total_latency_ms / max(1, self.request_count), 2)
         endpoint_averages = {
-            ep: round(self.endpoint_latency_ms[ep] / max(1, self.endpoint_calls[ep]), 2)
-            for ep in self.endpoint_calls
+            ep: round(self.endpoint_latency_ms[ep] / max(1, self.endpoint_calls[ep]), 2) for ep in self.endpoint_calls
         }
         return {
             "total_requests": self.request_count,
@@ -88,7 +87,9 @@ class ProductionHardeningMiddleware(BaseHTTPMiddleware):
         if not path.startswith(("/health", "/live", "/ready", "/metrics", "/docs", "/openapi.json")):
             client_ip = request.client.host if request.client else "unknown"
             if not self._check_rate_limit(client_ip):
-                logger.warning(f"[RateLimitExceeded] Client '{client_ip}' exceeded limit on path '{path}' (Request ID: {req_id}).")
+                logger.warning(
+                    f"[RateLimitExceeded] Client '{client_ip}' exceeded limit on path '{path}' (Request ID: {req_id})."
+                )
                 return JSONResponse(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                     content={
@@ -107,7 +108,7 @@ class ProductionHardeningMiddleware(BaseHTTPMiddleware):
             metrics_registry.record_request(path, response.status_code, duration_ms)
             response.headers["X-Request-ID"] = req_id
             return response
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 # Global ASGI middleware 500 exception boundary
             duration_ms = round((time.time() - start_time) * 1000, 2)
             metrics_registry.record_request(path, 500, duration_ms)
             err_msg = str(exc)

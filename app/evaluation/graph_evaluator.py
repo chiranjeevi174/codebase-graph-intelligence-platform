@@ -36,7 +36,9 @@ class GraphEvaluator:
                 evaluated_cases += 1
 
         if evaluated_cases == 0:
-            return MultiHopReasoningReport(path_found_rate=1.0, path_accuracy=1.0, relationship_accuracy=1.0, node_coverage=1.0)
+            return MultiHopReasoningReport(
+                path_found_rate=1.0, path_accuracy=1.0, relationship_accuracy=1.0, node_coverage=1.0
+            )
 
         return MultiHopReasoningReport(
             path_found_rate=found_sum / evaluated_cases,

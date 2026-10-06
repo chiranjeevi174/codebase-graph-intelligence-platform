@@ -1,6 +1,7 @@
 """Integration test for end-to-end evaluation benchmark framework."""
 
 from pathlib import Path
+
 import pytest
 
 from app.evaluation.evaluation_runner import EvaluationRunner

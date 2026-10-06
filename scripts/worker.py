@@ -7,7 +7,10 @@ from pathlib import Path
 # Add project root to sys.path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from typing import ClassVar
+
 from arq.connections import RedisSettings
+
 from app.config.settings import get_settings
 from app.jobs.worker import perform_pr_analysis_job
 from app.utils.logger import logger
@@ -19,6 +22,7 @@ async def startup(ctx: dict):
     """Validate connectivity and initialize worker runtime context."""
     logger.info(f"[WorkerLifecycle] Initializing worker startup checks on Redis at '{settings.REDIS_URL}'...")
     from app.jobs.repository import JobRepository
+
     repo = JobRepository(settings=settings)
     client = repo._get_redis_client()
     if client is None and settings.ENVIRONMENT == "production":
@@ -34,7 +38,7 @@ async def shutdown(ctx: dict):
 class WorkerSettings:
     """ARQ Worker Configuration Class."""
 
-    functions = [perform_pr_analysis_job]
+    functions: ClassVar = [perform_pr_analysis_job]
     redis_settings = RedisSettings.from_dsn(settings.REDIS_URL)
     max_jobs = settings.WORKER_MAX_JOBS
     poll_delay = 0.5
@@ -45,6 +49,9 @@ class WorkerSettings:
 
 
 if __name__ == "__main__":
-    logger.info(f"Starting ARQ PR Analysis Worker process (Environment: {settings.ENVIRONMENT}) connecting to Redis at '{settings.REDIS_URL}'...")
+    logger.info(
+        f"Starting ARQ PR Analysis Worker process (Environment: {settings.ENVIRONMENT}) connecting to Redis at '{settings.REDIS_URL}'..."
+    )
     from arq.worker import run_worker
+
     run_worker(WorkerSettings)

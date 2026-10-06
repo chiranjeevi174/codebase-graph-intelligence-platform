@@ -3,7 +3,7 @@
 import json
 import re
 from pathlib import Path
-from typing import Any
+
 import yaml
 
 from app.models.entities import (
@@ -72,15 +72,20 @@ class APIExtractor:
         filename = Path(file_path).name.lower()
 
         # 1. Check OpenAPI / Swagger spec files
-        if filename in ("openapi.yaml", "openapi.yml", "openapi.json", "swagger.json", "swagger.yaml") or ext in (".yaml", ".yml"):
+        if filename in ("openapi.yaml", "openapi.yml", "openapi.json", "swagger.json", "swagger.yaml") or ext in (
+            ".yaml",
+            ".yml",
+        ):
             try:
                 parsed_contracts = self._extract_openapi_contracts(file_path, content, repository_id)
                 if parsed_contracts:
                     for c in parsed_contracts:
-                        logger.info(f"[openapi_contract_detected] Contract {c.http_method} {c.path_template} in {c.file_path}")
+                        logger.info(
+                            f"[openapi_contract_detected] Contract {c.http_method} {c.path_template} in {c.file_path}"
+                        )
                     contracts.extend(parsed_contracts)
                     return endpoints, client_calls, contracts
-            except Exception as e:
+            except (json.JSONDecodeError, yaml.YAMLError, Exception) as e:  # noqa: BLE001
                 logger.debug(f"File {file_path} is not an OpenAPI spec: {e}")
 
         lines = content.splitlines()
@@ -94,13 +99,17 @@ class APIExtractor:
             endpoints.extend(self._extract_go_endpoints(file_path, lines, repository_id))
 
         for ep in endpoints:
-            logger.info(f"[api_endpoint_detected] Endpoint {ep.http_method} {ep.path} in {ep.file_path}:{ep.start_line}")
+            logger.info(
+                f"[api_endpoint_detected] Endpoint {ep.http_method} {ep.path} in {ep.file_path}:{ep.start_line}"
+            )
 
         # 3. Extract Frontend / Client API calls (JS, TS, Python, etc.)
         if source_file.language in ("javascript", "typescript", "python"):
             extracted_calls = self._extract_client_calls(file_path, source_file.language, lines, repository_id)
             for call in extracted_calls:
-                logger.info(f"[api_client_call_detected] Client call {call.http_method} {call.url} in {call.file_path}:{call.start_line}")
+                logger.info(
+                    f"[api_client_call_detected] Client call {call.http_method} {call.url} in {call.file_path}:{call.start_line}"
+                )
             client_calls.extend(extracted_calls)
 
         return endpoints, client_calls, contracts
@@ -245,7 +254,9 @@ class APIExtractor:
 
         return endpoints
 
-    def _extract_client_calls(self, file_path: str, language: str, lines: list[str], repository_id: str) -> list[ApiClientCall]:
+    def _extract_client_calls(
+        self, file_path: str, language: str, lines: list[str], repository_id: str
+    ) -> list[ApiClientCall]:
         calls: list[ApiClientCall] = []
         mod_name = file_path.replace("/", ".")
 
@@ -302,7 +313,7 @@ class APIExtractor:
                 data = json.loads(content)
             else:
                 data = yaml.safe_load(content)
-        except Exception:
+        except (json.JSONDecodeError, yaml.YAMLError, AttributeError, ValueError):
             return contracts
 
         if not isinstance(data, dict) or "paths" not in data:

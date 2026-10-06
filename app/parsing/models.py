@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 class ParserConfig(BaseModel):
     """Configuration options for AST parsers."""
+
     extract_docstrings: bool = True
     extract_calls: bool = True
     extract_imports: bool = True

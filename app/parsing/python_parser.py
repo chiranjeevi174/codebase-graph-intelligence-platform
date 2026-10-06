@@ -45,7 +45,7 @@ class PythonASTParser(BaseParser):
         except SyntaxError as e:
             logger.warning(f"Syntax error parsing {clean_rel_path}: {e}")
             return ExtractedCodeData(repository_id=repository_id, file_info=source_file)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — Top-level Python AST parser error boundary
             raise ParserError(f"Unexpected error parsing {clean_rel_path}: {e}")
 
         # Determine module qualified name
@@ -115,7 +115,9 @@ class PythonASTParser(BaseParser):
                 self._process_class_def(node, parent_qn, repo_id, source_file, lines, symbols, chunks)
             elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 if enclosing_class:
-                    self._process_method_def(node, parent_qn, enclosing_class, repo_id, source_file, lines, symbols, chunks)
+                    self._process_method_def(
+                        node, parent_qn, enclosing_class, repo_id, source_file, lines, symbols, chunks
+                    )
                 else:
                     self._process_function_def(node, parent_qn, repo_id, source_file, lines, symbols, chunks)
 
@@ -364,7 +366,7 @@ class PythonASTParser(BaseParser):
             return None
         try:
             return ast.unparse(node).strip()
-        except Exception:
+        except (TypeError, ValueError, AttributeError):
             if isinstance(node, ast.Name):
                 return node.id
             elif isinstance(node, ast.Attribute):

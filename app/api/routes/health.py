@@ -25,7 +25,7 @@ def readiness_check(response: Response):
     try:
         client = Neo4jClient(settings=settings)
         neo4j_ready = client.verify_connectivity()
-    except Exception:
+    except Exception:  # noqa: BLE001 # Health probe service connectivity fallback
         neo4j_ready = False
 
     qdrant_ready = False
@@ -33,16 +33,19 @@ def readiness_check(response: Response):
         qdrant = QdrantStore(settings=settings)
         qdrant.ensure_collection()
         qdrant_ready = True
-    except Exception:
+    except Exception:  # noqa: BLE001 # Health probe service connectivity fallback
         qdrant_ready = False
 
     redis_ready = False
     try:
         import redis
-        r = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True, socket_timeout=settings.REDIS_TIMEOUT_SECONDS)
+
+        r = redis.Redis.from_url(
+            settings.REDIS_URL, decode_responses=True, socket_timeout=settings.REDIS_TIMEOUT_SECONDS
+        )
         redis_ready = bool(r.ping())
         r.close()
-    except Exception:
+    except Exception:  # noqa: BLE001 # Health probe service connectivity fallback
         redis_ready = False
 
     is_production = settings.ENVIRONMENT == "production"
@@ -78,7 +81,7 @@ def health_check():
         client = Neo4jClient(settings=settings)
         if client.verify_connectivity():
             neo4j_status = "connected"
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 # Health probe service diagnostic fallback
         neo4j_status = f"disconnected: {e}"
 
     qdrant_status = "unknown"
@@ -86,23 +89,25 @@ def health_check():
         qdrant = QdrantStore(settings=settings)
         qdrant.ensure_collection()
         qdrant_status = "connected"
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 # Health probe service diagnostic fallback
         qdrant_status = f"disconnected: {e}"
 
     redis_status = "disconnected"
     try:
         import redis
+
         r = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True, socket_timeout=1.0)
         if r.ping():
             redis_status = "connected"
         r.close()
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 # Health probe service diagnostic fallback
         redis_status = f"disconnected: {e}"
 
     active_jobs = 0
     worker_liveness = "idle"
     try:
         from app.jobs.repository import JobRepository
+
         repo = JobRepository()
         running_jobs = repo.list_jobs(status="RUNNING")
         active_jobs = len(running_jobs)
@@ -110,8 +115,10 @@ def health_check():
             worker_liveness = "active" if active_jobs > 0 else "ready"
         else:
             worker_liveness = "in_memory_fallback"
-    except Exception:
-        pass
+    except Exception as e:  # noqa: BLE001 # Health probe job repository fallback
+        import logging
+
+        logging.getLogger(__name__).debug(f"Health check job repository lookup failed: {e}")
 
     return {
         "status": "healthy",

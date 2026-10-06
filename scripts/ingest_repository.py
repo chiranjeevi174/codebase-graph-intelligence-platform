@@ -65,7 +65,7 @@ def main():
                 print(f" ... and {len(res.errors) - 10} more errors.")
         print()
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — Top-level CLI script entry point exception handler
         logger.error(f"Repository ingestion failed: {e}")
         sys.exit(1)
 

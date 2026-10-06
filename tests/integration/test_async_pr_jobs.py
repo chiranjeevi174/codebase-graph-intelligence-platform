@@ -1,7 +1,6 @@
 """Integration tests for async PR analysis job queue execution, worker dispatch, and API routes."""
 
 import pytest
-import pytest_asyncio
 from fastapi.testclient import TestClient
 
 from app.api.main import create_app
@@ -113,7 +112,9 @@ async def test_async_pr_job_failure_handling(client):
     job.max_attempts = 1
     service.repo.update_job(job)
 
-    with patch("app.pr.service.PRAnalysisService.analyze_pr", side_effect=RuntimeError("Graph database connectivity error")):
+    with patch(
+        "app.pr.service.PRAnalysisService.analyze_pr", side_effect=RuntimeError("Graph database connectivity error")
+    ):
         exec_res = await execute_pr_job_direct(job.job_id)
         assert exec_res["status"] in ("FAILED", "DEAD_LETTER")
 
@@ -121,4 +122,3 @@ async def test_async_pr_job_failure_handling(client):
     updated_job = service.get_job(job.job_id)
     assert updated_job.status in (PRJobStatus.FAILED, PRJobStatus.DEAD_LETTER)
     assert updated_job.error is not None
-

@@ -1,6 +1,7 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -40,7 +41,10 @@ class PRJobRequest(BaseModel):
     target_ref: str = Field(default="HEAD", description="Target Git ref")
     dry_run: bool = Field(default=True, description="True if running in dry-run mode without posting platform comments")
     max_hops: int = Field(default=3, description="Maximum graph traversal depth")
-    wait: bool = Field(default=False, description="If True, block safely and wait for completion. Default False returns 202 Accepted job")
+    wait: bool = Field(
+        default=False,
+        description="If True, block safely and wait for completion. Default False returns 202 Accepted job",
+    )
     provider_delivery_id: str | None = Field(default=None, description="Optional webhook delivery event ID")
     action: PRAction = Field(default=PRAction.OPENED, description="Normalized PR/MR action event")
 
@@ -58,10 +62,14 @@ class PRAnalysisJob(BaseModel):
     dry_run: bool = Field(default=True, description="Dry run status")
     max_hops: int = Field(default=3, description="Max hops")
     status: PRJobStatus = Field(default=PRJobStatus.QUEUED, description="Current job status")
-    comment_status: PRCommentStatus = Field(default=PRCommentStatus.PENDING, description="Platform comment posting status")
+    comment_status: PRCommentStatus = Field(
+        default=PRCommentStatus.PENDING, description="Platform comment posting status"
+    )
     attempt: int = Field(default=1, description="Current execution attempt count")
     max_attempts: int = Field(default=3, description="Maximum retry attempts")
-    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat(), description="ISO 8601 creation timestamp")
+    created_at: str = Field(
+        default_factory=lambda: datetime.now(UTC).isoformat(), description="ISO 8601 creation timestamp"
+    )
     queued_at: str | None = Field(default=None, description="ISO 8601 queue timestamp")
     started_at: str | None = Field(default=None, description="ISO 8601 execution start timestamp")
     completed_at: str | None = Field(default=None, description="ISO 8601 completion timestamp")
@@ -99,13 +107,12 @@ class PRJobResult(BaseModel):
 
     job_id: str = Field(..., description="Unique job identifier")
     status: PRJobStatus = Field(..., description="Current job status")
-    comment_status: PRCommentStatus = Field(default=PRCommentStatus.NOT_REQUESTED, description="Platform comment status")
+    comment_status: PRCommentStatus = Field(
+        default=PRCommentStatus.NOT_REQUESTED, description="Platform comment status"
+    )
     analysis_run_id: str | None = Field(default=None, description="Result analysis run ID")
     error: str | None = Field(default=None, description="Error message if job failed")
     result: Any | None = Field(default=None, description="PRAnalysisResult dictionary or object")
     worker_id: str | None = Field(default=None, description="Worker runtime identifier")
     duration_ms: float | None = Field(default=None, description="Total execution duration in milliseconds")
     retry_count: int = Field(default=0, description="Retry attempt count")
-
-
-

@@ -81,7 +81,7 @@ class LocalGitLoader(RepositoryLoader):
                 with open(gitignore_path, "r", encoding="utf-8", errors="ignore") as f:
                     patterns = f.read().splitlines()
                 return pathspec.PathSpec.from_lines("gitignore", patterns)
-            except Exception as e:
+            except (OSError, Exception) as e:  # noqa: BLE001 — Safe .gitignore parsing fallback
                 logger.warning(f"Failed to parse .gitignore at {gitignore_path}: {e}")
         return None
 
@@ -91,22 +91,23 @@ class LocalGitLoader(RepositoryLoader):
             res = subprocess.run(
                 ["git", "rev-parse", "HEAD"],
                 cwd=str(repo_root),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                capture_output=True,
                 text=True,
                 check=False,
             )
             if res.returncode == 0:
                 return res.stdout.strip()
-        except Exception:
-            pass
+        except (OSError, subprocess.SubprocessError) as e:
+            logger.debug(f"Could not retrieve git commit hash for {repo_root}: {e}")
         return None
 
     def load_repository(self, target_path: str) -> tuple[RepositoryInfo, list[SourceFile]]:
         """Scans local path, enumerates files, filters ignores, and produces metadata."""
         repo_path = Path(target_path).resolve()
         if not repo_path.exists() or not repo_path.is_dir():
-            raise RepositoryIngestionError(f"Target repository path does not exist or is not a directory: {target_path}")
+            raise RepositoryIngestionError(
+                f"Target repository path does not exist or is not a directory: {target_path}"
+            )
 
         repo_name = repo_path.name
         repo_id = repo_name.lower().replace(" ", "_").replace("-", "_")
@@ -149,12 +150,14 @@ class LocalGitLoader(RepositoryLoader):
                     try:
                         size_bytes = full_path.stat().st_size
                         if size_bytes > MAX_FILE_SIZE_BYTES:
-                            logger.warning(f"Skipping file {rel_str}: size ({size_bytes} bytes) exceeds maximum limit ({MAX_FILE_SIZE_BYTES} bytes)")
+                            logger.warning(
+                                f"Skipping file {rel_str}: size ({size_bytes} bytes) exceeds maximum limit ({MAX_FILE_SIZE_BYTES} bytes)"
+                            )
                             continue
 
                         with open(full_path, "r", encoding="utf-8", errors="ignore") as f:
                             lines = len(f.readlines())
-                    except Exception as e:
+                    except (OSError, Exception) as e:  # noqa: BLE001 — Safe file stats reading fallback
                         logger.warning(f"Failed to read stats for {full_path}: {e}")
                         lines = 0
                         size_bytes = 0

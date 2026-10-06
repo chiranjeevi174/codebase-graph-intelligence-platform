@@ -1,8 +1,7 @@
 """Evaluation runner orchestrating end-to-end benchmark execution across cases."""
 
-from datetime import datetime, timezone
 import time
-from typing import Any
+from datetime import UTC, datetime
 
 from app.evaluation.answer_evaluator import AnswerEvaluator
 from app.evaluation.dataset_loader import load_evaluation_dataset
@@ -12,7 +11,6 @@ from app.evaluation.metrics import entity_resolution_metrics
 from app.evaluation.models import (
     BenchmarkReport,
     EntityResolutionReport,
-    EvalCase,
     FailureCategory,
     FailureRecord,
     ReproducibilityMetadata,
@@ -72,7 +70,7 @@ class EvaluationRunner:
                     repository_id=case.repository_id,
                     debug=True,
                 )
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 # Eval case execution isolation boundary
                 logger.error(f"Execution error for case {case.case_id}: {e}")
                 failures.append(
                     FailureRecord(
@@ -109,7 +107,9 @@ class EvaluationRunner:
             # Extract resolved entities and paths
             resolved_names = []
             if response.debug_info and "resolved_entities" in response.debug_info:
-                resolved_names = [e.get("qualified_name") or e.get("name", "") for e in response.debug_info["resolved_entities"]]
+                resolved_names = [
+                    e.get("qualified_name") or e.get("name", "") for e in response.debug_info["resolved_entities"]
+                ]
             resolved_entities_list.append(resolved_names)
 
             paths = [GraphPath.model_validate(p) for p in response.graph_paths] if response.graph_paths else []
@@ -128,7 +128,9 @@ class EvaluationRunner:
                         details=f"Answer validation failed: {response.debug_info.get('validation_errors') if response.debug_info else 'Ungrounded claims'}",
                     )
                 )
-            elif case.expected_entities and not any(exp.lower() in str(resolved_names).lower() for exp in case.expected_entities):
+            elif case.expected_entities and not any(
+                exp.lower() in str(resolved_names).lower() for exp in case.expected_entities
+            ):
                 failures.append(
                     FailureRecord(
                         case_id=case.case_id,
@@ -178,7 +180,7 @@ class EvaluationRunner:
         # Build Metadata
         llm = get_llm()
         metadata = ReproducibilityMetadata(
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             llm_provider=llm.provider_name,
             k_values=k_values or [1, 3, 5, 10],
         )

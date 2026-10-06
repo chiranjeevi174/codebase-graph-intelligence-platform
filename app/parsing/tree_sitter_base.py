@@ -46,11 +46,12 @@ class TreeSitterBaseParser(BaseParser):
         if self._ts_parser is None:
             try:
                 import warnings
+
                 with warnings.catch_warnings():
                     warnings.filterwarnings("ignore", category=FutureWarning, module="tree_sitter")
                     warnings.filterwarnings("ignore", category=FutureWarning, message=".*Language.*is deprecated.*")
                     self._ts_parser = get_parser(self.ts_language_name)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — Tree-sitter parser initialization boundary
                 raise ParserError(f"Failed to initialize tree-sitter parser for '{self.ts_language_name}': {e}")
         return self._ts_parser
 
@@ -61,7 +62,7 @@ class TreeSitterBaseParser(BaseParser):
             ts_parser = self._get_ts_parser()
             content_bytes = bytes(content, "utf-8")
             tree = ts_parser.parse(content_bytes)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — Fallback for malformed source code parsing failures
             logger.warning(f"Error parsing {clean_rel_path} with Tree-sitter ({self.language}): {e}")
             return ExtractedCodeData(repository_id=repository_id, file_info=source_file)
 
@@ -82,7 +83,7 @@ class TreeSitterBaseParser(BaseParser):
                 calls,
                 inheritance,
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 — AST traversal boundary for malformed code nodes
             logger.warning(f"Failed during tree-sitter traversal for {clean_rel_path}: {e}")
 
         # Generate symbol-aware chunks
@@ -168,7 +169,9 @@ class TreeSitterBaseParser(BaseParser):
                         file_path=file_path,
                         language=self.language,
                         symbol_name=sym.symbol_name,
-                        symbol_type=sym.symbol_type.value if hasattr(sym.symbol_type, "value") else str(sym.symbol_type),
+                        symbol_type=sym.symbol_type.value
+                        if hasattr(sym.symbol_type, "value")
+                        else str(sym.symbol_type),
                         start_line=st,
                         end_line=end,
                         content=snippet,

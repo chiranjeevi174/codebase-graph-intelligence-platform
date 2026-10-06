@@ -1,11 +1,10 @@
 """FastAPI Application Main Factory and Endpoint Setup."""
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
-from pathlib import Path
 from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import analysis, graph, health, ingestion, jobs, query, source, webhooks
@@ -38,6 +37,7 @@ def create_app() -> FastAPI:
 
     # Add Production Hardening Middleware
     from app.api.middleware import ProductionHardeningMiddleware
+
     app.add_middleware(ProductionHardeningMiddleware)
 
     # Configure CORS

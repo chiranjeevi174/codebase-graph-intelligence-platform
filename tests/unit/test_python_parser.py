@@ -58,7 +58,7 @@ def test_python_ast_parser_extraction(sample_python_code):
 
 
 def test_python_ast_parser_advanced_features():
-    code = '''
+    code = """
 from typing import Generic, TypeVar
 
 T = TypeVar("T")
@@ -69,7 +69,7 @@ class Container(Generic[T]):
         def inner_helper():
             pass
         self.val = normal_arg
-'''
+"""
     source_file = SourceFile(
         file_path="app\\nested\\container.py",
         relative_path="app\\nested\\container.py",
@@ -98,4 +98,3 @@ class Container(Generic[T]):
     funcs = [s for s in extracted.symbols if isinstance(s, FunctionInfo)]
     func_names = [f.symbol_name for f in funcs]
     assert "inner_helper" in func_names
-

@@ -7,7 +7,6 @@ from app.diff.structural_diff import FileSnapshotPair
 from app.models.entities import ApiClientCall, ApiContract, ApiEndpoint, SourceFile
 from app.parsing.api_extractor import APIExtractor
 from app.parsing.url_normalizer import normalize_url_path
-from app.utils.logger import logger
 
 
 class ApiDiffEngine:
@@ -45,7 +44,9 @@ class ApiDiffEngine:
                     file_path=fc.old_path or fc.file_path,
                     relative_path=fc.old_path or fc.file_path,
                     language=fc.language,
-                    extension=(fc.old_path or fc.file_path).split(".")[-1] if "." in (fc.old_path or fc.file_path) else "",
+                    extension=(fc.old_path or fc.file_path).split(".")[-1]
+                    if "." in (fc.old_path or fc.file_path)
+                    else "",
                 )
                 if g_svc and pair.file_change.old_commit and (fc.old_path or fc.file_path):
                     content = g_svc.get_file_content_at_ref(pair.file_change.old_commit, fc.old_path or fc.file_path)
@@ -64,7 +65,9 @@ class ApiDiffEngine:
                     file_path=fc.new_path or fc.file_path,
                     relative_path=fc.new_path or fc.file_path,
                     language=fc.language,
-                    extension=(fc.new_path or fc.file_path).split(".")[-1] if "." in (fc.new_path or fc.file_path) else "",
+                    extension=(fc.new_path or fc.file_path).split(".")[-1]
+                    if "." in (fc.new_path or fc.file_path)
+                    else "",
                 )
                 if g_svc and pair.file_change.new_commit and (fc.new_path or fc.file_path):
                     content = g_svc.get_file_content_at_ref(pair.file_change.new_commit, fc.new_path or fc.file_path)
@@ -112,7 +115,9 @@ class ApiDiffEngine:
         for key, b_ep in base_endpoints.items():
             if key not in target_endpoints:
                 # Check if path moved or removed completely
-                handler_still_exists = any(t.controller_symbol == b_ep.controller_symbol for t in target_endpoints.values())
+                handler_still_exists = any(
+                    t.controller_symbol == b_ep.controller_symbol for t in target_endpoints.values()
+                )
                 if not handler_still_exists:
                     api_changes.append(
                         ApiChange(
@@ -169,7 +174,9 @@ class ApiDiffEngine:
             norm_old_path = normalize_url_path(ac.old_path or ac.path)
             for cc in client_calls:
                 norm_call_url = normalize_url_path(cc.url)
-                if norm_old_path and (norm_old_path == norm_call_url or norm_call_url in norm_old_path or norm_old_path in norm_call_url):
+                if norm_old_path and (
+                    norm_old_path == norm_call_url or norm_call_url in norm_old_path or norm_old_path in norm_call_url
+                ):
                     client_matches = True
                     break
 

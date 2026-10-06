@@ -1,10 +1,10 @@
 """LangGraph Graph RAG workflow state machine and orchestration pipeline for Phase 2.2."""
 
 from typing import Any
-from typing_extensions import TypedDict
 
 from langgraph.graph import END, StateGraph
 from langgraph.graph.state import CompiledStateGraph
+from typing_extensions import TypedDict
 
 from app.graph.graph_queries import GraphQueryManager
 from app.graph.subgraph_builder import FocusedSubgraph, SubgraphBuilder
@@ -34,7 +34,7 @@ class GraphRAGState(TypedDict):
     semantic_top_k: int
     final_top_k: int
     max_hops: int
-    
+
     query_analysis: QueryAnalysisResult | None
     resolved_entities: list[ResolvedEntity]
     graph_results: list[NormalizedSearchResult]
@@ -56,7 +56,9 @@ def query_analysis_node(state: GraphRAGState) -> dict[str, Any]:
         query=state["question"],
         repository_id=state.get("repository_id"),
     )
-    logger.info(f"[LangGraph Node: query_analysis] Query intent='{analysis.intent}' candidate_symbols={analysis.candidate_symbols}")
+    logger.info(
+        f"[LangGraph Node: query_analysis] Query intent='{analysis.intent}' candidate_symbols={analysis.candidate_symbols}"
+    )
     return {"query_analysis": analysis}
 
 
@@ -99,6 +101,7 @@ def graph_retrieval_node(state: GraphRAGState) -> dict[str, Any]:
             try:
                 from app.diff.diff_analyzer import StructuralDiffAnalyzer
                 from app.diff.diff_models import DiffRequest
+
                 diff_res = StructuralDiffAnalyzer().analyze_diff(
                     DiffRequest(
                         repository_id=state.get("repository_id") or "default",
@@ -124,7 +127,7 @@ def graph_retrieval_node(state: GraphRAGState) -> dict[str, Any]:
                         rrf_score=0.0,
                     )
                 )
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 — Optional diff context extraction boundary
                 logger.warning(f"Failed extracting diff in Graph RAG: {e}")
 
         records.extend(qm.find_symbol(entity.qualified_name))
@@ -133,7 +136,13 @@ def graph_retrieval_node(state: GraphRAGState) -> dict[str, Any]:
             if "path_nodes" in rec:
                 p_nodes = rec.get("path_nodes", [])
                 p_rels = rec.get("path_relationships", [])
-                path_str = " -> ".join([f"{n.get('name')} ({n.get('file_path')}:{n.get('start_line', 1)})" for n in p_nodes if isinstance(n, dict)])
+                path_str = " -> ".join(
+                    [
+                        f"{n.get('name')} ({n.get('file_path')}:{n.get('start_line', 1)})"
+                        for n in p_nodes
+                        if isinstance(n, dict)
+                    ]
+                )
                 first_node = p_nodes[0] if p_nodes and isinstance(p_nodes[0], dict) else {}
                 fpath = first_node.get("file_path") or entity.file_path
                 start_l = int(first_node.get("start_line") or 1)
@@ -159,8 +168,22 @@ def graph_retrieval_node(state: GraphRAGState) -> dict[str, Any]:
                         )
                     )
             else:
-                name = rec.get("caller_name") or rec.get("callee_name") or rec.get("target_name") or rec.get("source_name") or rec.get("name") or entity.name
-                qn = rec.get("caller_qn") or rec.get("callee_qn") or rec.get("target_qn") or rec.get("source_qn") or rec.get("qualified_name") or entity.qualified_name
+                name = (
+                    rec.get("caller_name")
+                    or rec.get("callee_name")
+                    or rec.get("target_name")
+                    or rec.get("source_name")
+                    or rec.get("name")
+                    or entity.name
+                )
+                qn = (
+                    rec.get("caller_qn")
+                    or rec.get("callee_qn")
+                    or rec.get("target_qn")
+                    or rec.get("source_qn")
+                    or rec.get("qualified_name")
+                    or entity.qualified_name
+                )
                 fpath = rec.get("file_path") or entity.file_path
                 start_l = int(rec.get("start_line") or entity.start_line or 1)
                 end_l = int(rec.get("end_line") or entity.end_line or start_l)
@@ -253,9 +276,7 @@ def context_fusion_node(state: GraphRAGState) -> dict[str, Any]:
         graph_paths=state.get("graph_paths"),
     )
 
-    sources = list(
-        {res.file_path for res in state.get("fused_results", []) if res.file_path}
-    )
+    sources = list({res.file_path for res in state.get("fused_results", []) if res.file_path})
     logger.info(f"[LangGraph Node: context_fusion] Context compiled ({len(fused_text)} chars). Sources: {len(sources)}")
     return {"fused_context": fused_text, "sources": sources}
 
@@ -274,16 +295,16 @@ def answer_generation_node(state: GraphRAGState) -> dict[str, Any]:
     )
 
     prompt = f"""User Question:
-{state['question']}
+{state["question"]}
 
 Retrieved Codebase Evidence & Graph Context:
-{state.get('fused_context', '')}
+{state.get("fused_context", "")}
 
 Provide a comprehensive, accurate, and grounded answer to the question using the context above."""
 
     try:
         answer = llm.generate(prompt=prompt, system_prompt=system_prompt, temperature=0.2)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — LangGraph LLM generation node resilience boundary
         logger.error(f"Error during LLM answer generation: {e}")
         answer = f"Error generating grounded answer: {e}"
 

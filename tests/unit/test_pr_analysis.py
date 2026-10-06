@@ -1,7 +1,8 @@
 """Unit test suite for PR Analysis, Webhook verification, Idempotency, and Comment Formatting."""
 
-import hmac
 import hashlib
+import hmac
+
 from app.config.settings import get_settings
 from app.integrations.factory import PRProviderFactory
 from app.integrations.github import GitHubProvider
@@ -90,8 +91,12 @@ def test_comment_formatter_and_marker():
         ),
         changed_files=["service.py", "client.ts"],
         changed_symbols=[{"symbol_name": "UserService", "file_path": "service.py", "change_type": "MODIFIED"}],
-        signature_changes=[{"symbol_name": "UserService.create", "old_signature": "create(a)", "new_signature": "create(a, b)"}],
-        api_changes=[{"endpoint_id": "GET:/api/users", "http_method": "GET", "path": "/api/users", "change_type": "MODIFIED"}],
+        signature_changes=[
+            {"symbol_name": "UserService.create", "old_signature": "create(a)", "new_signature": "create(a, b)"}
+        ],
+        api_changes=[
+            {"endpoint_id": "GET:/api/users", "http_method": "GET", "path": "/api/users", "change_type": "MODIFIED"}
+        ],
         affected_components=["UserController (controller.py:15)"],
         affected_files=["service.py", "controller.py"],
         cross_language_impacts=[{"description": "ClientCall -> ApiEndpoint"}],
@@ -151,8 +156,12 @@ def test_webhook_idempotency_caching():
         sig = "sha256=" + hmac.new(b"testsecret", body, hashlib.sha256).hexdigest()
         headers = {"X-Hub-Signature-256": sig}
 
-        res1 = service.process_webhook("github", body, payload, headers, repo_path="tests/fixtures/sample_repo", dry_run=True)
-        res2 = service.process_webhook("github", body, payload, headers, repo_path="tests/fixtures/sample_repo", dry_run=True)
+        res1 = service.process_webhook(
+            "github", body, payload, headers, repo_path="tests/fixtures/sample_repo", dry_run=True
+        )
+        res2 = service.process_webhook(
+            "github", body, payload, headers, repo_path="tests/fixtures/sample_repo", dry_run=True
+        )
 
         assert res1.analysis_run_id == res2.analysis_run_id
     finally:

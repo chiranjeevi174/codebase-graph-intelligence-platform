@@ -31,7 +31,7 @@ async def github_webhook(request: Request, response: Response):
     payload_bytes = await request.body()
     try:
         payload_dict = await request.json()
-    except Exception:
+    except Exception:  # noqa: BLE001 # Webhook JSON payload fallback boundary
         payload_dict = {}
 
     headers = dict(request.headers)
@@ -48,7 +48,9 @@ async def github_webhook(request: Request, response: Response):
         logger.info("[GitHubWebhook:pr_webhook_received] Received GitHub webhook (unverified, secret unconfigured).")
 
     # 2. Delivery Deduplication Check
-    delivery_id = headers.get("x-github-delivery") or headers.get("X-GitHub-Delivery") or payload_dict.get("delivery_id")
+    delivery_id = (
+        headers.get("x-github-delivery") or headers.get("X-GitHub-Delivery") or payload_dict.get("delivery_id")
+    )
     job_repo = JobRepository()
     if delivery_id and job_repo.is_duplicate_delivery("github", delivery_id):
         logger.info(f"[GitHubWebhook] Duplicate delivery '{delivery_id}' ignored.")
@@ -116,7 +118,7 @@ async def gitlab_webhook(request: Request, response: Response):
     payload_bytes = await request.body()
     try:
         payload_dict = await request.json()
-    except Exception:
+    except Exception:  # noqa: BLE001 # Webhook JSON payload fallback boundary
         payload_dict = {}
 
     headers = dict(request.headers)
@@ -133,7 +135,9 @@ async def gitlab_webhook(request: Request, response: Response):
         logger.info("[GitLabWebhook:pr_webhook_received] Received GitLab webhook (unverified, secret unconfigured).")
 
     # 2. Delivery Deduplication Check
-    delivery_id = headers.get("x-gitlab-event-uuid") or headers.get("X-Gitlab-Event-UUID") or payload_dict.get("delivery_id")
+    delivery_id = (
+        headers.get("x-gitlab-event-uuid") or headers.get("X-Gitlab-Event-UUID") or payload_dict.get("delivery_id")
+    )
     job_repo = JobRepository()
     if delivery_id and job_repo.is_duplicate_delivery("gitlab", delivery_id):
         logger.info(f"[GitLabWebhook] Duplicate delivery '{delivery_id}' ignored.")
@@ -193,4 +197,3 @@ async def gitlab_webhook(request: Request, response: Response):
         "created_at": job.created_at,
         "message": "MR analysis job accepted and enqueued.",
     }
-

@@ -66,7 +66,7 @@ def get_repository_graph_summary(repository_id: str, limit: int = 150):
                 "limit": limit,
             },
         }
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 # Safe UI graph payload fallback boundary
         return {
             "repository_id": repository_id,
             "status": "graph_unavailable",

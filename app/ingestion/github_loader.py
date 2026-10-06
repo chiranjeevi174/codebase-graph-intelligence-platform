@@ -33,7 +33,9 @@ class GitHubRepositoryLoader(RepositoryLoader):
         parts = clean_url.split("/")
         return parts[-1] if parts else "github_repo"
 
-    def load_repository(self, target_path: str, branch: str | None = None, force: bool = False) -> tuple[RepositoryInfo, list[SourceFile]]:
+    def load_repository(
+        self, target_path: str, branch: str | None = None, force: bool = False
+    ) -> tuple[RepositoryInfo, list[SourceFile]]:
         """Clone remote GitHub repository locally and scan source files."""
         if not self.is_github_url(target_path):
             raise RepositoryIngestionError(f"Provided path is not a valid GitHub URL: {target_path}")
@@ -56,14 +58,15 @@ class GitHubRepositoryLoader(RepositoryLoader):
             try:
                 res = subprocess.run(
                     cmd,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
+                    capture_output=True,
                     text=True,
                     check=False,
                 )
                 if res.returncode != 0:
                     raise RepositoryIngestionError(f"Failed to clone GitHub repository: {res.stderr}")
-            except Exception as e:
+            except RepositoryIngestionError:
+                raise
+            except Exception as e:  # noqa: BLE001 # External process clone error translation
                 raise RepositoryIngestionError(f"Git clone error for {target_path}: {e}")
         else:
             logger.info(f"Using existing cloned repository at {dest_dir}")

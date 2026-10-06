@@ -6,11 +6,11 @@ from app.integrations.github import GitHubProvider
 from app.integrations.gitlab import GitLabProvider
 
 __all__ = [
-    "PRProvider",
-    "PullRequestMetadata",
-    "PullRequestEvent",
-    "PRComment",
     "GitHubProvider",
     "GitLabProvider",
+    "PRComment",
+    "PRProvider",
     "PRProviderFactory",
+    "PullRequestEvent",
+    "PullRequestMetadata",
 ]

@@ -91,9 +91,13 @@ class JavaScriptParser(TreeSitterBaseParser):
                 start_line, _ = self._line_range(node)
 
                 if fn_text == "require":
-                    args = node.child_by_field_name("arguments") or (node.children[1] if len(node.children) > 1 else None)
+                    args = node.child_by_field_name("arguments") or (
+                        node.children[1] if len(node.children) > 1 else None
+                    )
                     if args and args.children:
-                        mod_name = self._node_text(args.children[1] if len(args.children) > 1 else args.children[0], content_bytes).strip("'\"`")
+                        mod_name = self._node_text(
+                            args.children[1] if len(args.children) > 1 else args.children[0], content_bytes
+                        ).strip("'\"`")
                         imports.append(
                             ImportInfo(
                                 file_path=file_path,
@@ -174,7 +178,11 @@ class JavaScriptParser(TreeSitterBaseParser):
                             params = []
                             params_node = member.child_by_field_name("parameters")
                             if params_node:
-                                params = [self._node_text(p, content_bytes) for p in params_node.children if p.type == "identifier"]
+                                params = [
+                                    self._node_text(p, content_bytes)
+                                    for p in params_node.children
+                                    if p.type == "identifier"
+                                ]
 
                             method_sym = MethodInfo(
                                 symbol_id=generate_symbol_id(repository_id, file_path, m_qn),
@@ -196,7 +204,9 @@ class JavaScriptParser(TreeSitterBaseParser):
 
             # 3. Functions
             elif node_type == "function_declaration":
-                fn_name_node = node.child_by_field_name("name") or (node.children[1] if len(node.children) > 1 else None)
+                fn_name_node = node.child_by_field_name("name") or (
+                    node.children[1] if len(node.children) > 1 else None
+                )
                 if fn_name_node and fn_name_node.type == "identifier":
                     fn_name = self._node_text(fn_name_node, content_bytes)
                     fn_qn = f"{module_qn}.{fn_name}"
@@ -205,7 +215,9 @@ class JavaScriptParser(TreeSitterBaseParser):
                     params = []
                     params_node = node.child_by_field_name("parameters")
                     if params_node:
-                        params = [self._node_text(p, content_bytes) for p in params_node.children if p.type == "identifier"]
+                        params = [
+                            self._node_text(p, content_bytes) for p in params_node.children if p.type == "identifier"
+                        ]
 
                     func_sym = FunctionInfo(
                         symbol_id=generate_symbol_id(repository_id, file_path, fn_qn),

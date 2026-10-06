@@ -1,10 +1,10 @@
 import os
 import socket
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
-from app.jobs.models import PRAnalysisJob, PRAnalysisRun, PRCommentStatus, PRJobStatus
+from app.jobs.models import PRAnalysisRun, PRCommentStatus, PRJobStatus
 from app.jobs.repository import JobRepository
 from app.pr.models import PRAnalysisRequest
 from app.pr.service import PRAnalysisService
@@ -17,7 +17,7 @@ def get_worker_id() -> str:
         host = socket.gethostname().split(".")[0]
         pid = os.getpid()
         return f"worker_{host}_{pid}"
-    except Exception:
+    except Exception:  # noqa: BLE001
         return "worker_local_1"
 
 
@@ -38,13 +38,15 @@ async def execute_pr_job_direct(job_id: str) -> dict[str, Any]:
         logger.error(f"[Worker] Job '{job_id}' not found in repository.")
         return {"status": "FAILED", "error": "Job not found"}
 
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
     job.status = PRJobStatus.RUNNING
     job.started_at = now_iso
     job.worker_id = worker_id
     repo_db.update_job(job)
 
-    logger.info(f"[Worker:job_started] Worker '{worker_id}' processing job '{job.job_id}' for {job.repository} #{job.pr_number} (Attempt {job.attempt}/{job.max_attempts})")
+    logger.info(
+        f"[Worker:job_started] Worker '{worker_id}' processing job '{job.job_id}' for {job.repository} #{job.pr_number} (Attempt {job.attempt}/{job.max_attempts})"
+    )
 
     try:
         # Delegate to PRAnalysisService
@@ -67,7 +69,7 @@ async def execute_pr_job_direct(job_id: str) -> dict[str, Any]:
 
         # Update job lifecycle & observability
         end_time = time.time()
-        end_iso = datetime.now(timezone.utc).isoformat()
+        end_iso = datetime.now(UTC).isoformat()
         job.status = PRJobStatus.COMPLETED
         job.completed_at = end_iso
         job.duration_ms = round((end_time - start_time) * 1000, 2)
@@ -104,10 +106,10 @@ async def execute_pr_job_direct(job_id: str) -> dict[str, Any]:
         logger.info(f"[Worker:job_completed] Job '{job.job_id}' completed by '{worker_id}' in {job.duration_ms}ms.")
         return {"status": "COMPLETED", "job_id": job.job_id, "analysis_run_id": result.analysis_run_id}
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — Top-level ARQ worker job isolation & failure classification boundary
         err_msg = str(e)
         end_time = time.time()
-        end_iso = datetime.now(timezone.utc).isoformat()
+        end_iso = datetime.now(UTC).isoformat()
         job.duration_ms = round((end_time - start_time) * 1000, 2)
 
         # Classify failure type
@@ -130,4 +132,3 @@ async def execute_pr_job_direct(job_id: str) -> dict[str, Any]:
 
         repo_db.update_job(job)
         return {"status": job.status.value, "job_id": job.job_id, "error": job.error}
-

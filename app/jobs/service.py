@@ -1,9 +1,7 @@
 """JobService orchestrating job submission, idempotency, queue dispatch, and status inspection."""
 
-import asyncio
 import hashlib
-from datetime import datetime, timezone
-from typing import Any
+from datetime import UTC, datetime
 
 from app.config.settings import Settings, get_settings
 from app.jobs.models import (
@@ -22,7 +20,9 @@ from app.utils.logger import logger
 class JobService:
     """Orchestrates job lifecycle submission, idempotency checks, and status API lookups."""
 
-    def __init__(self, repo: JobRepository | None = None, queue: PRJobQueue | None = None, settings: Settings | None = None):
+    def __init__(
+        self, repo: JobRepository | None = None, queue: PRJobQueue | None = None, settings: Settings | None = None
+    ):
         self.repo = repo or JobRepository()
         self.queue = queue or PRJobQueue()
         self.settings = settings or get_settings()
@@ -40,13 +40,15 @@ class JobService:
         # Check existing job
         existing = self.repo.find_existing_job_by_key(idempotency_key)
         if existing and existing.status in (PRJobStatus.QUEUED, PRJobStatus.RUNNING, PRJobStatus.COMPLETED):
-            logger.info(f"[JobService] Reusing existing job '{existing.job_id}' for idempotency key '{idempotency_key}' (Status: {existing.status.value}).")
+            logger.info(
+                f"[JobService] Reusing existing job '{existing.job_id}' for idempotency key '{idempotency_key}' (Status: {existing.status.value})."
+            )
             return existing
 
         # Generate deterministic job ID
-        key_hash = hashlib.md5(f"{idempotency_key}:{datetime.now(timezone.utc).timestamp()}".encode("utf-8")).hexdigest()[:10]
+        key_hash = hashlib.md5(f"{idempotency_key}:{datetime.now(UTC).timestamp()}".encode()).hexdigest()[:10]
         job_id = f"pr_job_{key_hash}"
-        now_iso = datetime.now(timezone.utc).isoformat()
+        now_iso = datetime.now(UTC).isoformat()
 
         job = PRAnalysisJob(
             job_id=job_id,
@@ -70,7 +72,9 @@ class JobService:
 
         # Enqueue job to worker queue asynchronously
         await self.queue.enqueue_pr_job(job)
-        logger.info(f"[JobService:job_created] Created and enqueued job '{job.job_id}' for {repo_clean} #{request.pr_number}.")
+        logger.info(
+            f"[JobService:job_created] Created and enqueued job '{job.job_id}' for {repo_clean} #{request.pr_number}."
+        )
 
         # If wait=True explicitly requested, execute or poll synchronously
         if request.wait:
@@ -87,7 +91,9 @@ class JobService:
         """Fetch completed result report for job ID."""
         return self.repo.get_job_result(job_id)
 
-    def list_jobs(self, repository: str | None = None, provider: str | None = None, status: str | None = None, limit: int = 50) -> list[PRAnalysisJob]:
+    def list_jobs(
+        self, repository: str | None = None, provider: str | None = None, status: str | None = None, limit: int = 50
+    ) -> list[PRAnalysisJob]:
         """List bounded historical jobs with filtering."""
         return self.repo.list_jobs(repository=repository, provider=provider, status=status, limit=limit)
 
@@ -98,7 +104,9 @@ class JobService:
             raise ValueError(f"Job '{job_id}' not found.")
 
         if job.status not in (PRJobStatus.FAILED, PRJobStatus.DEAD_LETTER):
-            raise ValueError(f"Job '{job_id}' in state '{job.status.value}' cannot be retried. Only FAILED or DEAD_LETTER jobs can be retried.")
+            raise ValueError(
+                f"Job '{job_id}' in state '{job.status.value}' cannot be retried. Only FAILED or DEAD_LETTER jobs can be retried."
+            )
 
         job.status = PRJobStatus.QUEUED
         job.attempt = 1
@@ -113,4 +121,3 @@ class JobService:
 
         logger.info(f"[JobService:job_retried] Manually retried job '{job.job_id}'.")
         return job
-

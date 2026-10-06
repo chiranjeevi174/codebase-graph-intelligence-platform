@@ -3,7 +3,6 @@
 from app.evaluation.metrics import (
     answer_completeness,
     citation_metrics,
-    compute_metric_set,
     entity_resolution_metrics,
     hit_at_k,
     mrr_at_k,
@@ -84,4 +83,3 @@ def test_structural_diff_metrics():
     assert res["symbol_change_detection_accuracy"] == 1.0
     assert res["affected_file_precision"] == 1.0
     assert res["affected_file_recall"] == 1.0
-

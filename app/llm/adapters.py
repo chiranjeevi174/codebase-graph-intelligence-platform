@@ -41,4 +41,3 @@ def to_openai_messages(messages: list[dict[str, Any]]) -> list[ChatCompletionMes
         else:
             raise ValueError(f"Unsupported message role for OpenAI provider: '{role}'")
     return typed_messages
-

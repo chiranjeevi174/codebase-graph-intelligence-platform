@@ -153,7 +153,9 @@ class TypeScriptParser(TreeSitterBaseParser):
                 start_line, end_line = self._line_range(node)
 
                 base_classes = []
-                heritage = node.child_by_field_name("heritage") or (node.children[2] if len(node.children) > 2 else None)
+                heritage = node.child_by_field_name("heritage") or (
+                    node.children[2] if len(node.children) > 2 else None
+                )
                 if heritage and hasattr(heritage, "children"):
                     for c in heritage.children:
                         if c.type == "extends_clause":
@@ -222,7 +224,9 @@ class TypeScriptParser(TreeSitterBaseParser):
 
             # 5. Functions
             elif node_type == "function_declaration":
-                fn_name_node = node.child_by_field_name("name") or (node.children[1] if len(node.children) > 1 else None)
+                fn_name_node = node.child_by_field_name("name") or (
+                    node.children[1] if len(node.children) > 1 else None
+                )
                 if fn_name_node:
                     fn_name = self._node_text(fn_name_node, content_bytes)
                     fn_qn = f"{module_qn}.{fn_name}"

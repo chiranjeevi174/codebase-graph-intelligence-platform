@@ -11,7 +11,6 @@ class BaseLLMProvider(ABC):
         """Initialize provider with optional settings and configuration."""
         self.settings = settings
 
-
     @abstractmethod
     def generate(
         self,

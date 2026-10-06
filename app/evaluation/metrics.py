@@ -236,4 +236,3 @@ def pr_analysis_metrics(actual_pr_result: dict, expected_pr_data: dict) -> dict[
         "pr_impact_path_accuracy": 1.0,
         "pr_cross_language_impact_accuracy": cross_acc,
     }
-

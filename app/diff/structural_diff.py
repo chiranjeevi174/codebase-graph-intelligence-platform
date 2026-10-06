@@ -48,7 +48,7 @@ class StructuralDiffExtractor:
                     try:
                         parser = ParserFactory.get_parser(fc.language)
                         base_data = parser.parse_file(base_sf, base_content, repository_id=repository_id)
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001 # Per-file parser resilience boundary
                         logger.warning(f"[StructuralDiffExtractor] Failed parsing base ref {fc.old_path}: {e}")
 
             # Target snapshot
@@ -67,7 +67,7 @@ class StructuralDiffExtractor:
                     try:
                         parser = ParserFactory.get_parser(fc.language)
                         target_data = parser.parse_file(target_sf, target_content, repository_id=repository_id)
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001 # Per-file parser resilience boundary
                         logger.warning(f"[StructuralDiffExtractor] Failed parsing target ref {fc.new_path}: {e}")
 
             snapshot_pairs.append(

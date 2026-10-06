@@ -1,11 +1,9 @@
 """Symbol-level structural diff engine."""
 
-from typing import Any
-
-from app.diff.diff_models import ChangeType, SignatureChangeInfo, SymbolChange
+from app.diff.diff_models import ChangeType, SymbolChange
 from app.diff.signature_diff import compare_signatures
 from app.diff.structural_diff import FileSnapshotPair
-from app.models.entities import CodeSymbol, FunctionInfo, MethodInfo
+from app.models.entities import CodeSymbol
 
 
 class SymbolDiffEngine:
@@ -40,7 +38,9 @@ class SymbolDiffEngine:
                             language=fc.language,
                             symbol_name=t_sym.symbol_name,
                             qualified_name=t_sym.qualified_name,
-                            symbol_type=str(t_sym.symbol_type.value if hasattr(t_sym.symbol_type, 'value') else t_sym.symbol_type),
+                            symbol_type=str(
+                                t_sym.symbol_type.value if hasattr(t_sym.symbol_type, "value") else t_sym.symbol_type
+                            ),
                             change_type=ChangeType.ADDED,
                             start_line=t_sym.start_line,
                             end_line=t_sym.end_line,
@@ -62,7 +62,9 @@ class SymbolDiffEngine:
                             language=fc.language,
                             symbol_name=b_sym.symbol_name,
                             qualified_name=b_sym.qualified_name,
-                            symbol_type=str(b_sym.symbol_type.value if hasattr(b_sym.symbol_type, 'value') else b_sym.symbol_type),
+                            symbol_type=str(
+                                b_sym.symbol_type.value if hasattr(b_sym.symbol_type, "value") else b_sym.symbol_type
+                            ),
                             change_type=ChangeType.REMOVED,
                             start_line=b_sym.start_line,
                             end_line=b_sym.end_line,
@@ -82,11 +84,11 @@ class SymbolDiffEngine:
                 has_sig_change = sig_info.signature_changed if sig_info else False
 
                 # Check if lines, docstrings, parameters, decorators or body changed
-                lines_changed = (b_sym.start_line != t_sym.start_line or b_sym.end_line != t_sym.end_line)
-                doc_changed = (b_sym.docstring != t_sym.docstring)
+                lines_changed = b_sym.start_line != t_sym.start_line or b_sym.end_line != t_sym.end_line
+                doc_changed = b_sym.docstring != t_sym.docstring
 
                 is_modified = has_sig_change or lines_changed or doc_changed
-                
+
                 # Check decorators or base_classes if class/func
                 b_decs = getattr(b_sym, "decorators", [])
                 t_decs = getattr(t_sym, "decorators", [])
@@ -107,7 +109,9 @@ class SymbolDiffEngine:
                             language=fc.language,
                             symbol_name=t_sym.symbol_name,
                             qualified_name=t_sym.qualified_name,
-                            symbol_type=str(t_sym.symbol_type.value if hasattr(t_sym.symbol_type, 'value') else t_sym.symbol_type),
+                            symbol_type=str(
+                                t_sym.symbol_type.value if hasattr(t_sym.symbol_type, "value") else t_sym.symbol_type
+                            ),
                             change_type=chg_type,
                             start_line=t_sym.start_line,
                             end_line=t_sym.end_line,

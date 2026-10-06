@@ -32,7 +32,10 @@ class QueryAnalyzer:
             intent = "api_client"
         elif any(w in q_lower for w in ["backend endpoint", "endpoint", "controller implements", "handler"]):
             intent = "endpoint"
-        elif any(w in q_lower for w in ["request flow", "api flow", "frontend to backend", "cross language", "cross-language"]):
+        elif any(
+            w in q_lower
+            for w in ["request flow", "api flow", "frontend to backend", "cross language", "cross-language"]
+        ):
             intent = "api_flow"
         elif any(w in q_lower for w in ["who calls", "called by", "caller", "callers"]):
             intent = "callers"
@@ -42,7 +45,10 @@ class QueryAnalyzer:
             intent = "dependency"
         elif any(w in q_lower for w in ["trace", "flow", "execution", "path from", "call path", "sequence"]):
             intent = "execution_flow"
-        elif any(w in q_lower for w in ["diff", "what changed", "changed between", "last commit", "commit changes", "symbol changed"]):
+        elif any(
+            w in q_lower
+            for w in ["diff", "what changed", "changed between", "last commit", "commit changes", "symbol changed"]
+        ):
             intent = "diff"
         elif any(w in q_lower for w in ["affected", "impact", "change", "modifying"]):
             intent = "impact"

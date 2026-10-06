@@ -83,7 +83,9 @@ def extract_route_template(url_path: str) -> str:
     path = re.sub(r"/\d+(?=/|$)", "/{param}", path)
 
     # 3. Replace UUID strings e.g. /123e4567-e89b-12d3-a456-426614174000
-    path = re.sub(r"/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}(?=/|$)", "/{param}", path)
+    path = re.sub(
+        r"/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}(?=/|$)", "/{param}", path
+    )
 
     return path
 
@@ -120,8 +122,6 @@ def match_urls(
         return True, "PATH_TEMPLATE_MATCH"
 
     # 3. Base URL / suffix match e.g. /users vs /api/users
-    c_base = c_path.split("/")[-1]
-    e_base = e_path.split("/")[-1]
     if c_path.endswith(e_path) or e_path.endswith(c_path):
         return True, "BASE_URL_PLUS_PATH"
 

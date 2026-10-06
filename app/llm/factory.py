@@ -1,6 +1,5 @@
 """LLM Provider Factory for obtaining provider instances dynamically."""
 
-
 from typing import ClassVar
 
 from app.config.settings import Settings, get_settings
@@ -38,7 +37,9 @@ class LLMFactory:
 
         provider_cls = cls._providers.get(target_provider)
         if not provider_cls:
-            raise LLMProviderError(f"Unsupported LLM provider '{target_provider}'. Available providers: {list(cls._providers.keys())}")
+            raise LLMProviderError(
+                f"Unsupported LLM provider '{target_provider}'. Available providers: {list(cls._providers.keys())}"
+            )
 
         logger.info(f"Instantiating LLM provider '{target_provider}'...")
         return provider_cls(settings=cfg)
@@ -47,4 +48,3 @@ class LLMFactory:
 def get_llm(provider: str | None = None) -> BaseLLMProvider:
     """Convenience module function to get LLM provider instance."""
     return LLMFactory.get_llm(provider=provider)
-

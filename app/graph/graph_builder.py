@@ -141,8 +141,10 @@ class GraphBuilder:
                         "file_path": call.file_path,
                     },
                 )
-            except Exception as e:
-                logger.debug(f"Failed to resolve CALLS relationship between {call.caller_qualified_name} -> {call.callee_name}: {e}")
+            except Exception as e:  # noqa: BLE001 # Partial graph ingestion fallback boundary
+                logger.debug(
+                    f"Failed to resolve CALLS relationship between {call.caller_qualified_name} -> {call.callee_name}: {e}"
+                )
 
         # 5. Create INHERITS / IMPLEMENTS relationships
         for inh in data.inheritance:
@@ -163,7 +165,7 @@ class GraphBuilder:
                         "parent_name": inh.parent_name,
                     },
                 )
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 # Partial graph ingestion fallback boundary
                 logger.debug(f"Failed to link {rel_type} relation {inh.child_qualified_name} -> {inh.parent_name}: {e}")
 
         # 6. Create ApiEndpoint nodes
@@ -209,7 +211,7 @@ class GraphBuilder:
                         "response_schema": ep.response_schema or "",
                     },
                 )
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 # Partial graph ingestion fallback boundary
                 logger.debug(f"Failed to ingest ApiEndpoint {ep.endpoint_id}: {e}")
 
         # 7. Create ApiClientCall nodes
@@ -248,7 +250,7 @@ class GraphBuilder:
                         "end_line": call.end_line,
                     },
                 )
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 # Partial graph ingestion fallback boundary
                 logger.debug(f"Failed to ingest ApiClientCall {call.call_id}: {e}")
 
         # 8. Create ApiContract nodes
@@ -282,7 +284,7 @@ class GraphBuilder:
                         "summary": c.summary or "",
                     },
                 )
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 # Partial graph ingestion fallback boundary
                 logger.debug(f"Failed to ingest ApiContract {c.contract_id}: {e}")
 
     def ingest_api_matches(self, matches: list) -> int:
@@ -342,7 +344,7 @@ class GraphBuilder:
                     },
                 )
                 count += 1
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 # Partial graph ingestion fallback boundary
                 logger.debug(f"Failed to write API match relationship {source_id} -> {target_id}: {e}")
 
         return count
