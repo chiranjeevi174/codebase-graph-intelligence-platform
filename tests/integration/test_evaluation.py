@@ -10,7 +10,7 @@ from app.evaluation.models import BenchmarkReport
 
 @pytest.mark.integration
 def test_evaluation_benchmark_run():
-    dataset_path = Path("data/evaluation/codebase_questions.jsonl").resolve()
+    dataset_path = Path("tests/fixtures/evaluation/codebase_questions.jsonl").resolve()
     assert dataset_path.exists(), f"Dataset path {dataset_path} must exist"
 
     output_dir = Path("data/evaluation/results_test").resolve()

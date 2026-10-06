@@ -51,7 +51,7 @@ def test_observability_endpoints(client):
 
     # Ready
     res_ready = client.get("/ready")
-    assert res_ready.status_code in (200, 530)
+    assert res_ready.status_code in (200, 503)
     ready_data = res_ready.json()
     assert "status" in ready_data
     assert "services" in ready_data

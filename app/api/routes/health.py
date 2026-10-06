@@ -52,7 +52,7 @@ def readiness_check(response: Response):
     is_ready = neo4j_ready and qdrant_ready and (redis_ready if is_production else True)
 
     if not is_ready:
-        response.status_code = status.HTTP_530_SERVICE_UNAVAILABLE
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
 
     return {
         "status": "ready" if is_ready else "unready",
