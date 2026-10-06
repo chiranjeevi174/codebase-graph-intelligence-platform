@@ -366,7 +366,7 @@ class ImpactSummary(BaseModel):
     transitive_dependencies_count: int = 0
     affected_files_count: int = 0
     affected_symbols_count: int = 0
-    max_hops_used: int = 2
+    max_hops_used: int | str = 2
     analysis_truncated: bool = False
 
 
@@ -375,7 +375,7 @@ class ImpactAnalysisRequest(BaseModel):
 
     symbol: str = Field(..., description="Target symbol name, qualified name, or file+symbol")
     repository_id: str | None = Field(None, description="Optional target repository identifier")
-    max_hops: int = Field(2, description="Maximum traversal depth (1 to 5)")
+    max_hops: int | str = Field(2, description="Maximum traversal depth (1, 2, 3, or 'all')")
     max_nodes: int = Field(50, description="Maximum total nodes to evaluate")
     max_relationships: int = Field(100, description="Maximum relationships to traverse")
 

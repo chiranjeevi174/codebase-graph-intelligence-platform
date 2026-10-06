@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.llm.adapters import to_groq_messages, to_openai_messages
+from app.llm.adapters import to_openai_messages
 
 
 def test_to_openai_messages_valid_roles():
@@ -28,22 +28,4 @@ def test_to_openai_messages_unsupported_role():
         to_openai_messages(raw_messages)
 
 
-def test_to_groq_messages_valid_roles():
-    raw_messages = [
-        {"role": "system", "content": "System prompt"},
-        {"role": "user", "content": "User prompt"},
-        {"role": "assistant", "content": "Assistant prompt"},
-        {"role": "tool", "content": "Tool result", "tool_call_id": "call_456"},
-    ]
-    converted = to_groq_messages(raw_messages)
-    assert len(converted) == 4
-    assert converted[0] == {"role": "system", "content": "System prompt"}
-    assert converted[1] == {"role": "user", "content": "User prompt"}
-    assert converted[2] == {"role": "assistant", "content": "Assistant prompt"}
-    assert converted[3] == {"role": "tool", "content": "Tool result", "tool_call_id": "call_456"}
 
-
-def test_to_groq_messages_unsupported_role():
-    raw_messages = [{"role": "developer", "content": "test"}]
-    with pytest.raises(ValueError, match="Unsupported message role for Groq provider"):
-        to_groq_messages(raw_messages)

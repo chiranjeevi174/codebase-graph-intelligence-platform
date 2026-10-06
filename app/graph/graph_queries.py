@@ -183,14 +183,27 @@ class GraphQueryManager:
         return self.client.execute_read(query, {"name": symbol_name_or_qn})
 
     def find_transitive_dependents(
-        self, symbol_name_or_qn: str, max_hops: int = 2, limit: int = 50
+        self,
+        symbol_name_or_qn: str,
+        max_hops: int | str = 2,
+        limit: int = 100,
+        repository_id: str | None = None,
     ) -> list[dict[str, Any]]:
         """Find nodes that depend directly or transitively on the target symbol (Upstream Impact)."""
-        hops = max(1, min(max_hops, 5))
+        if isinstance(max_hops, str) and max_hops.lower() == "all":
+            hops = 10
+        else:
+            try:
+                hops = max(1, min(int(max_hops), 10))
+            except (ValueError, TypeError):
+                hops = 2
+
         limit_val = max(1, min(limit, 500))
         query = f"""
         MATCH path = (source)-[*1..{hops}]->(target)
-        WHERE target.name = $name OR target.qualified_name = $name OR target.symbol_id = $name
+        WHERE (target.name = $name OR target.qualified_name = $name OR target.symbol_id = $name)
+          AND ($repo_id IS NULL OR target.repository_id = $repo_id OR target.repository_id IS NULL)
+          AND ($repo_id IS NULL OR source.repository_id = $repo_id OR source.repository_id IS NULL)
         RETURN labels(source) AS labels, source.symbol_id AS symbol_id, source.name AS name,
                source.qualified_name AS qualified_name, source.file_path AS file_path,
                source.start_line AS start_line, source.end_line AS end_line,
@@ -200,17 +213,30 @@ class GraphQueryManager:
                [node in nodes(path) | node.file_path] AS path_files
         LIMIT {limit_val}
         """
-        return self.client.execute_read(query, {"name": symbol_name_or_qn})
+        return self.client.execute_read(query, {"name": symbol_name_or_qn, "repo_id": repository_id})
 
     def find_transitive_dependencies(
-        self, symbol_name_or_qn: str, max_hops: int = 2, limit: int = 50
+        self,
+        symbol_name_or_qn: str,
+        max_hops: int | str = 2,
+        limit: int = 100,
+        repository_id: str | None = None,
     ) -> list[dict[str, Any]]:
         """Find nodes that the target symbol directly or transitively depends on (Downstream Impact)."""
-        hops = max(1, min(max_hops, 5))
+        if isinstance(max_hops, str) and max_hops.lower() == "all":
+            hops = 10
+        else:
+            try:
+                hops = max(1, min(int(max_hops), 10))
+            except (ValueError, TypeError):
+                hops = 2
+
         limit_val = max(1, min(limit, 500))
         query = f"""
         MATCH path = (source)-[*1..{hops}]->(target)
-        WHERE source.name = $name OR source.qualified_name = $name OR source.symbol_id = $name
+        WHERE (source.name = $name OR source.qualified_name = $name OR source.symbol_id = $name)
+          AND ($repo_id IS NULL OR source.repository_id = $repo_id OR source.repository_id IS NULL)
+          AND ($repo_id IS NULL OR target.repository_id = $repo_id OR target.repository_id IS NULL)
         RETURN labels(target) AS labels, target.symbol_id AS symbol_id, target.name AS name,
                target.qualified_name AS qualified_name, target.file_path AS file_path,
                target.start_line AS start_line, target.end_line AS end_line,
@@ -220,17 +246,33 @@ class GraphQueryManager:
                [node in nodes(path) | node.file_path] AS path_files
         LIMIT {limit_val}
         """
-        return self.client.execute_read(query, {"name": symbol_name_or_qn})
+        return self.client.execute_read(query, {"name": symbol_name_or_qn, "repo_id": repository_id})
 
-    def find_api_flow(self, identifier: str, max_hops: int = 3) -> list[dict[str, Any]]:
+    def find_api_flow(
+        self,
+        identifier: str,
+        max_hops: int | str = 3,
+        repository_id: str | None = None,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
         """Traverse cross-language API relationships connecting client calls, endpoints, contracts, and controllers."""
-        hops = max(1, min(max_hops, 5))
+        if isinstance(max_hops, str) and max_hops.lower() == "all":
+            hops = 10
+        else:
+            try:
+                hops = max(1, min(int(max_hops), 10))
+            except (ValueError, TypeError):
+                hops = 3
+
+        limit_val = max(1, min(limit, 500))
         query = f"""
         MATCH path = (n)-[*1..{hops}]-(m)
-        WHERE n.name CONTAINS $id OR n.qualified_name CONTAINS $id
+        WHERE (n.name CONTAINS $id OR n.qualified_name CONTAINS $id
            OR (n:ApiEndpoint AND (n.endpoint_id = $id OR n.path = $id))
            OR (n:ApiClientCall AND (n.call_id = $id OR n.url = $id))
-           OR (n:ApiContract AND (n.contract_id = $id OR n.path_template = $id))
+           OR (n:ApiContract AND (n.contract_id = $id OR n.path_template = $id)))
+          AND ($repo_id IS NULL OR n.repository_id = $repo_id OR n.repository_id IS NULL)
+          AND ($repo_id IS NULL OR m.repository_id = $repo_id OR m.repository_id IS NULL)
         RETURN [node in nodes(path) | {{
             name: node.name,
             qualified_name: node.qualified_name,
@@ -242,8 +284,26 @@ class GraphQueryManager:
         }}] AS path_nodes,
         [rel in relationships(path) | type(rel)] AS path_relationships,
         length(path) AS hop_count
-        LIMIT 20
+        LIMIT {limit_val}
         """
-        return self.client.execute_read(query, {"id": identifier})
+        raw_paths = self.client.execute_read(query, {"id": identifier, "repo_id": repository_id})
+
+        # Deduplicate paths deterministically based on canonical sequence
+        seen_signatures: set[tuple] = set()
+        unique_paths: list[dict[str, Any]] = []
+        for p in raw_paths:
+            nodes_seq = tuple(
+                (n.get("qualified_name") or n.get("name") or n.get("symbol_id") or n.get("file_path"))
+                for n in (p.get("path_nodes") or [])
+                if isinstance(n, dict)
+            )
+            rels_seq = tuple(p.get("path_relationships") or [])
+            sig = (nodes_seq, rels_seq)
+            if sig not in seen_signatures:
+                seen_signatures.add(sig)
+                unique_paths.append(p)
+
+        return unique_paths
+
 
 

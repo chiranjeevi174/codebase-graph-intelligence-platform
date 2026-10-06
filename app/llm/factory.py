@@ -5,8 +5,6 @@ from typing import ClassVar
 
 from app.config.settings import Settings, get_settings
 from app.llm.base import BaseLLMProvider
-from app.llm.gemini_provider import GeminiProvider
-from app.llm.groq_provider import GroqProvider
 from app.llm.openai_provider import OpenAIProvider
 from app.utils.exceptions import LLMProviderError
 from app.utils.logger import logger
@@ -16,8 +14,6 @@ class LLMFactory:
     """Factory for instantiating provider-agnostic LLM clients."""
 
     _providers: ClassVar[dict[str, type[BaseLLMProvider]]] = {
-        "groq": GroqProvider,
-        "gemini": GeminiProvider,
         "openai": OpenAIProvider,
     }
 
@@ -31,7 +27,7 @@ class LLMFactory:
         """Instantiate and return configured LLM provider.
 
         Args:
-            provider: Optional provider name ("groq", "gemini", "openai"). If None, uses settings.LLM_PROVIDER.
+            provider: Optional provider name ("openai"). If None, uses settings.LLM_PROVIDER.
             settings: Optional Settings object.
 
         Returns:
@@ -51,3 +47,4 @@ class LLMFactory:
 def get_llm(provider: str | None = None) -> BaseLLMProvider:
     """Convenience module function to get LLM provider instance."""
     return LLMFactory.get_llm(provider=provider)
+

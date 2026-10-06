@@ -10,10 +10,8 @@ def test_settings():
     """Return test settings override."""
     return Settings(
         APP_NAME="Test Graph Intelligence Platform",
-        ENVIRONMENT="testing",
-        LLM_PROVIDER="groq",
-        GROQ_API_KEY="test_groq_key",
-        GEMINI_API_KEY="test_gemini_key",
+        ENVIRONMENT="test",
+        LLM_PROVIDER="openai",
         OPENAI_API_KEY="test_openai_key",
     )
 

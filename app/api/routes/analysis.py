@@ -42,7 +42,11 @@ def analyze_api_flow(request: ApiFlowAnalysisRequest):
     """Analyze cross-language API flow connecting client calls, endpoints, and OpenAPI contracts."""
     try:
         qm = GraphQueryManager()
-        raw_paths = qm.find_api_flow(identifier=request.path_or_symbol, max_hops=request.max_hops)
+        raw_paths = qm.find_api_flow(
+            identifier=request.path_or_symbol,
+            max_hops=request.max_hops,
+            repository_id=request.repository_id,
+        )
         return ApiFlowAnalysisResponse(
             query_term=request.path_or_symbol,
             paths_found=len(raw_paths),

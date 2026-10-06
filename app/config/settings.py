@@ -57,17 +57,11 @@ class Settings(BaseSettings):
     EMBEDDING_MODEL: str = "BAAI/bge-small-en-v1.5"
 
     # LLM Provider selection
-    LLM_PROVIDER: Literal["groq", "gemini", "openai"] = "groq"
+    LLM_PROVIDER: Literal["openai"] = "openai"
 
-    # Provider specific settings
-    GROQ_API_KEY: str = ""
-    GROQ_MODEL: str = "openai/gpt-oss-120b"
-
-    GEMINI_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-2.5-flash"
-
+    # OpenAI Provider settings
     OPENAI_API_KEY: str = ""
-    OPENAI_MODEL: str = "gpt-4o"
+    OPENAI_MODEL: str = "gpt-4o-mini"
 
     # PR & Webhook Integration settings
     GITHUB_WEBHOOK_SECRET: str = ""

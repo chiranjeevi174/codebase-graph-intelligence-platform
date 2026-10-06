@@ -1,5 +1,6 @@
 /**
  * PR Analysis UI Handler with SSE Real-time Updates and Polling Fallback.
+ * Formats pull request impact, changed symbols, signature diffs, and analysis history.
  */
 
 import { state } from "./state.js";
@@ -39,7 +40,7 @@ export async function handlePRSubmit() {
       provider: provider,
       repository: repo,
       pr_number: prNum,
-      repo_path: "tests/fixtures/sample_repo",
+      repo_path: repo.includes("/") ? null : `tests/fixtures/${repo || state.selectedRepository || 'sample_repo'}`,
       base_ref: baseRef,
       target_ref: targetRef,
       dry_run: dryRun,
@@ -64,8 +65,8 @@ export async function handlePRSubmit() {
       prResultsContainer.innerHTML = `
         <div class="card">
           <div class="card-title">
-            <span>Async PR Job: ${jobId}</span>
-            <span id="job-status-badge" class="tag tag-purple">${jobData.status || 'QUEUED'}</span>
+            <span>Async PR Job: <code>${escapeHtml(jobId)}</code></span>
+            <span id="job-status-badge" class="tag tag-purple">${escapeHtml(jobData.status || 'QUEUED')}</span>
           </div>
           <div style="font-size:13px; color:var(--text-secondary); margin-top:8px;">
             Job queued for background processing. Receiving real-time SSE stream...
@@ -148,13 +149,13 @@ export async function handlePRSubmit() {
     if (jobStatus === "FAILED" || jobStatus === "DEAD_LETTER") {
       if (prResultsContainer) {
         prResultsContainer.innerHTML = `
-          <div class="card">
+          <div class="card" style="border-color:rgba(244,63,94,0.3);">
             <div class="card-title">
-              <span>PR Analysis Job (${jobId})</span>
-              <span class="tag tag-rose">${jobStatus}</span>
+              <span>PR Analysis Job (<code>${escapeHtml(jobId)}</code>)</span>
+              <span class="tag tag-rose">${escapeHtml(jobStatus)}</span>
             </div>
             <div style="font-size:13px; color:var(--accent-rose); margin-top:8px;">
-              Job failed: ${finalJob.error || 'Execution encountered an unrecoverable error.'}
+              Job failed: ${escapeHtml(finalJob.error || 'Execution encountered an unrecoverable error.')}
             </div>
             <div style="margin-top:12px;">
               <button id="btn-retry-job-${jobId}" class="btn btn-secondary">Retry Job</button>
@@ -198,41 +199,47 @@ export async function handlePRSubmit() {
 
     if (prResultsContainer) {
       const summary = response.summary || {};
-      const fileItems = (response.changed_files || []).map((f) => `<div class="tree-node"><span>${f}</span><span class="tag tag-blue">Changed File</span></div>`).join("");
+      const fileItems = (response.changed_files || []).map((f) => `
+        <div class="tree-node">
+          <span><code>${escapeHtml(f)}</code></span>
+          <span class="tag tag-blue">Changed File</span>
+        </div>
+      `).join("");
+
       const symItems = (response.changed_symbols || []).map((s) => `
         <div class="tree-node">
           <div>
-            <strong>${s.symbol_name || s.qualified_name}</strong>
-            <div style="font-size:11px; color:var(--text-muted)">File: ${s.file_path || 'N/A'}</div>
+            <strong>${escapeHtml(s.symbol_name || s.qualified_name)}</strong>
+            <div style="font-size:11px; color:var(--text-muted)">File: ${escapeHtml(s.file_path || 'N/A')}</div>
           </div>
-          <span class="tag tag-purple">${s.change_type || 'MODIFIED'}</span>
+          <span class="tag tag-purple">${escapeHtml(s.change_type || 'MODIFIED')}</span>
         </div>
       `).join("");
 
       const historyRows = (historyItems || []).slice(0, 5).map((h) => `
         <tr>
-          <td><code>${h.analysis_run_id}</code></td>
-          <td><code>${(h.head_sha || '').substring(0, 7)}</code></td>
-          <td><span class="tag ${h.status === 'COMPLETED' ? 'tag-emerald' : 'tag-rose'}">${h.status}</span></td>
-          <td>${h.comment_status || 'NOT_REQUESTED'}</td>
+          <td><code>${escapeHtml(h.analysis_run_id)}</code></td>
+          <td><code>${escapeHtml((h.head_sha || '').substring(0, 7))}</code></td>
+          <td><span class="tag ${h.status === 'COMPLETED' ? 'tag-emerald' : 'tag-rose'}">${escapeHtml(h.status)}</span></td>
+          <td>${escapeHtml(h.comment_status || 'NOT_REQUESTED')}</td>
         </tr>
       `).join("");
 
       prResultsContainer.innerHTML = `
         <div class="card">
           <div class="card-title">
-            <span>PR #${response.pr_number} Analysis (${response.provider.toUpperCase()})</span>
-            <span class="tag tag-emerald">Job: ${jobId}</span>
+            <span>PR #${response.pr_number} Analysis (${escapeHtml(response.provider).toUpperCase()})</span>
+            <span class="tag tag-emerald">Job: ${escapeHtml(jobId)}</span>
           </div>
-          <div style="font-size:13px; color:var(--text-secondary)">
-            ${response.explanation || 'Pull request structural analysis compiled.'}
+          <div style="font-size:13px; color:var(--text-secondary); line-height:1.5;">
+            ${escapeHtml(response.explanation || 'Pull request structural analysis compiled.')}
           </div>
           <table class="kv-table">
-            <tr><td class="kv-key">Job ID</td><td class="kv-val">${jobId}</td></tr>
+            <tr><td class="kv-key">Job ID</td><td class="kv-val">${escapeHtml(jobId)}</td></tr>
             <tr><td class="kv-key">Job Status</td><td class="kv-val">COMPLETED</td></tr>
-            <tr><td class="kv-key">Worker ID</td><td class="kv-val">${finalJob.worker_id || 'worker_local'}</td></tr>
+            <tr><td class="kv-key">Worker ID</td><td class="kv-val">${escapeHtml(finalJob.worker_id || 'worker_local')}</td></tr>
             <tr><td class="kv-key">Execution Duration</td><td class="kv-val">${finalJob.duration_ms ? finalJob.duration_ms + ' ms' : 'N/A'}</td></tr>
-            <tr><td class="kv-key">Comment Status</td><td class="kv-val">${finalJob.comment_status || 'NOT_REQUESTED'}</td></tr>
+            <tr><td class="kv-key">Comment Status</td><td class="kv-val">${escapeHtml(finalJob.comment_status || 'NOT_REQUESTED')}</td></tr>
             <tr><td class="kv-key">Changed Files</td><td class="kv-val">${summary.changed_files_count || 0}</td></tr>
             <tr><td class="kv-key">Changed Symbols</td><td class="kv-val">${summary.changed_symbols_count || 0}</td></tr>
             <tr><td class="kv-key">Signature Changes</td><td class="kv-val">${summary.signature_changes_count || 0}</td></tr>
@@ -274,7 +281,14 @@ export async function handlePRSubmit() {
     }
   } catch (err) {
     if (prResultsContainer) {
-      prResultsContainer.innerHTML = `<span style="color:var(--accent-rose)">PR Analysis Failed: ${err.message}</span>`;
+      prResultsContainer.innerHTML = `
+        <div class="card" style="border-color:rgba(244,63,94,0.3);">
+          <div class="card-title" style="color:var(--accent-rose);">PR Analysis Failed</div>
+          <div style="color:var(--text-secondary); font-size:13px;">
+            ${escapeHtml(err?.message || String(err))}
+          </div>
+        </div>
+      `;
     }
   } finally {
     if (prBtn) {
@@ -282,4 +296,21 @@ export async function handlePRSubmit() {
       prBtn.innerHTML = `Analyze Pull Request`;
     }
   }
+}
+
+function escapeHtml(text) {
+  if (!text) return "";
+  if (typeof text === "object") {
+    try {
+      text = JSON.stringify(text);
+    } catch {
+      return "—";
+    }
+  }
+  return String(text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }

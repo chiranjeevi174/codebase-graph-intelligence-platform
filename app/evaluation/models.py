@@ -133,7 +133,7 @@ class ReproducibilityMetadata(BaseModel):
     timestamp: str
     commit_hash: str | None = None
     embedding_model: str = "BAAI/bge-small-en-v1.5"
-    llm_provider: str = "groq"
+    llm_provider: str = "openai"
     dataset_version: str = "1.0"
     k_values: list[int] = Field(default_factory=lambda: [1, 3, 5, 10])
     max_hops: int = 2

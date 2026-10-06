@@ -1,15 +1,38 @@
 /**
  * Codebase Query UI Handler (Graph RAG Workflow).
+ * Provides dynamic repository-specific suggestions and grounded evidence citation exploration.
  */
 
 import { executeQuery } from "./api.js";
 import { updateGraphData } from "./graph.js";
 import { state } from "./state.js";
 
+const REPOSITORY_SUGGESTIONS = {
+  sample_repo: [
+    { label: "User Auth & JWT Flow", prompt: "How does user authentication and JWT validation work across routes?" },
+    { label: "Trace /api/orders", prompt: "Trace the /api/orders endpoint to the database and payment service." },
+    { label: "UserService Dependents", prompt: "What components and handlers depend directly or indirectly on UserService?" },
+    { label: "Payment Checkout Logic", prompt: "How is payment processing handled in PaymentService and OrderService?" },
+    { label: "Architecture Summary", prompt: "Explain the high-level architecture, models, and service boundaries in sample_repo." },
+  ],
+  multi_language_repo: [
+    { label: "Polyglot Architecture", prompt: "How do Python, TypeScript, Go, and Java components interoperate in this repository?" },
+    { label: "Cross-Language API Contracts", prompt: "Trace API contracts and endpoints shared between the Go service and Python backend." },
+    { label: "Go Inventory Handlers", prompt: "Which Go handlers handle inventory management and API client requests?" },
+    { label: "Java Service Dependencies", prompt: "What backend services call the Java order processing or database layer?" },
+    { label: "TypeScript Client Calls", prompt: "Where are the TypeScript API client calls defined and which endpoints do they hit?" },
+  ],
+  diff_repo: [
+    { label: "Changed AST Symbols", prompt: "What AST symbols and methods were modified or added between HEAD~1 and HEAD?" },
+    { label: "Structural Refactoring Impact", prompt: "What is the structural blast radius of recent changes in the repository?" },
+    { label: "Modified API Contracts", prompt: "Were any API routes or model signatures changed in the latest commit?" },
+    { label: "Compare Recent Commits", prompt: "Summarize code and signature evolution across recent commits." },
+  ],
+};
+
 export function initQueryView() {
   const queryBtn = document.getElementById("btn-run-query");
   const queryInput = document.getElementById("query-input");
-  const suggestions = document.querySelectorAll(".prompt-chip");
 
   if (queryBtn) {
     queryBtn.addEventListener("click", () => handleQuerySubmit());
@@ -24,8 +47,41 @@ export function initQueryView() {
     });
   }
 
-  suggestions.forEach((chip) => {
+  // Render initial suggestions for current repo
+  renderRepositorySuggestions(state.selectedRepository || "sample_repo");
+
+  // Subscribe to repo changes to refresh suggestions dynamically
+  state.subscribe((event, data) => {
+    if (event === "repo_changed") {
+      renderRepositorySuggestions(data);
+    }
+  });
+}
+
+/**
+ * Render repository-specific question suggestions dynamically.
+ */
+export function renderRepositorySuggestions(repoId) {
+  const container = document.getElementById("query-suggestions-list");
+  if (!container) return;
+
+  const suggestions = REPOSITORY_SUGGESTIONS[repoId] || [
+    { label: "Core Architecture", prompt: `Explain the core architecture, classes, and entrypoints of ${repoId}.` },
+    { label: "API Endpoints & Routes", prompt: `What API routes and HTTP handlers are defined in ${repoId}?` },
+    { label: "Service Dependencies", prompt: `Trace key service dependencies and database operations in ${repoId}.` },
+    { label: "Key Classes & Methods", prompt: `What are the primary classes and function workflows in ${repoId}?` },
+  ];
+
+  container.innerHTML = suggestions.map((s) => `
+    <button type="button" class="prompt-chip" data-prompt="${escapeAttr(s.prompt)}" title="${escapeAttr(s.prompt)}">
+      ${escapeHtml(s.label)}
+    </button>
+  `).join("");
+
+  // Attach click listeners to new chips
+  container.querySelectorAll(".prompt-chip").forEach((chip) => {
     chip.addEventListener("click", () => {
+      const queryInput = document.getElementById("query-input");
       if (queryInput) {
         queryInput.value = chip.dataset.prompt || chip.innerText.trim();
         handleQuerySubmit();
@@ -36,11 +92,6 @@ export function initQueryView() {
 
 /**
  * Adapt backend GraphPath items into Cytoscape-compatible nodes and relationships.
- * Safely handles current GraphPath schema:
- *   { source_node, target_node, relationships, hop_count, path_sequence }
- *
- * @param {Array} graphPaths
- * @returns {{ nodes: Array, relationships: Array }}
  */
 function adaptGraphPaths(graphPaths) {
   const nodes = [];
@@ -65,8 +116,9 @@ function adaptGraphPaths(graphPaths) {
       nodes.push({
         id: id,
         name: rawNode.name || rawNode.qualified_name || id,
-        qualified_name: rawNode.qualified_name || "",
+        qualified_name: rawNode.qualified_name || rawNode.name || "",
         label: label,
+        symbol_type: rawNode.symbol_type || label,
         file_path: rawNode.file_path || "",
         start_line: typeof rawNode.start_line === "number" ? rawNode.start_line : 1,
         end_line: typeof rawNode.end_line === "number" ? rawNode.end_line : 1,
@@ -82,17 +134,14 @@ function adaptGraphPaths(graphPaths) {
     const targetNode = p.target_node;
     const rels = Array.isArray(p.relationships) ? p.relationships : [];
     const hopCount = typeof p.hop_count === "number" ? p.hop_count : 1;
-    const pathSequence = Array.isArray(p.path_sequence) ? p.path_sequence : [];
 
     const sourceId = addNode(sourceNode);
     const targetId = addNode(targetNode);
 
-    // Backward-compatibility: if legacy p.nodes exists, safely index them
     if (Array.isArray(p.nodes)) {
       p.nodes.forEach((n) => addNode(n));
     }
 
-    // Single-hop path: create direct edge between endpoints
     if (hopCount === 1 && sourceId && targetId) {
       let relType = "RELATED";
       if (rels.length > 0) {
@@ -110,7 +159,6 @@ function adaptGraphPaths(graphPaths) {
         type: relType,
       });
     } else if (Array.isArray(p.relationships)) {
-      // Legacy edge support if relationships contains object descriptors
       p.relationships.forEach((r, rIdx) => {
         if (r && typeof r === "object" && r.source_id && r.target_id) {
           relationships.push({
@@ -175,27 +223,28 @@ export async function handleQuerySubmit() {
         validationBadge.innerHTML = `<span class="status-dot"></span> Grounded Evidence Validated`;
       } else {
         validationBadge.className = "status-badge warning";
-        const errorText = response.validation_errors ? response.validation_errors.join("; ") : "Ungrounded claims";
-        validationBadge.innerHTML = `<span class="status-dot"></span> Validation Warning: ${errorText}`;
+        const errorText = response.validation_errors ? response.validation_errors.join("; ") : "Ungrounded claims detected";
+        validationBadge.innerHTML = `<span class="status-dot"></span> Validation Warning: ${escapeHtml(errorText)}`;
       }
     }
 
-    // Render Sources as Clickable Pills
+    // Render Sources as Clickable Interactive Pills
     if (sourcesContainer) {
       sourcesContainer.innerHTML = "";
       if (response.sources && response.sources.length > 0) {
         response.sources.forEach((src) => {
           const pill = document.createElement("button");
+          pill.type = "button";
           pill.className = "source-pill";
           pill.textContent = src;
-          pill.title = `View source code for ${src}`;
+          pill.title = `Click to inspect code at ${src}`;
           pill.addEventListener("click", () => {
             state.setSelectedSource(src);
           });
           sourcesContainer.appendChild(pill);
         });
       } else {
-        sourcesContainer.innerHTML = `<span style="color:var(--text-muted); font-size:12px;">No direct sources cited</span>`;
+        sourcesContainer.innerHTML = `<span style="color:var(--text-muted); font-size:12px;">No direct sources cited in response</span>`;
       }
     }
 
@@ -213,8 +262,8 @@ export async function handleQuerySubmit() {
         const trace = response.retrieval_trace;
         debugTraceContainer.innerHTML = `
           <div style="font-size:12px; font-family:var(--font-mono); color:var(--text-secondary); display:flex; flex-direction:column; gap:6px;">
-            <div><strong>Query Intent:</strong> ${trace.query_intent || 'N/A'}</div>
-            <div><strong>Resolved Entities:</strong> ${(trace.resolved_entities || []).join(', ') || 'None'}</div>
+            <div><strong>Query Intent:</strong> ${escapeHtml(trace.query_intent || 'N/A')}</div>
+            <div><strong>Resolved Entities:</strong> ${escapeHtml((trace.resolved_entities || []).join(', ') || 'None')}</div>
             <div><strong>Graph Matches:</strong> ${trace.graph_results_count || 0}</div>
             <div><strong>Semantic Vector Matches:</strong> ${trace.semantic_results_count || 0}</div>
             <div><strong>Fused RRF Results:</strong> ${trace.fused_results_count || 0}</div>
@@ -225,11 +274,8 @@ export async function handleQuerySubmit() {
     }
   } catch (err) {
     console.error("GRAPH RAG QUERY ERROR:", err);
-    console.error("GRAPH RAG QUERY ERROR MESSAGE:", err?.message);
-    console.error("GRAPH RAG QUERY ERROR STACK:", err?.stack);
-
     if (answerText) {
-      answerText.innerHTML = `<span style="color:var(--accent-rose)">Error executing query: ${err.message}</span>`;
+      answerText.innerHTML = `<span style="color:var(--accent-rose)">Error executing query: ${escapeHtml(err.message)}</span>`;
     }
   } finally {
     if (queryBtn) {
@@ -237,4 +283,19 @@ export async function handleQuerySubmit() {
       queryBtn.innerHTML = `Send Question`;
     }
   }
+}
+
+function escapeHtml(text) {
+  if (!text) return "";
+  return String(text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function escapeAttr(text) {
+  if (!text) return "";
+  return String(text).replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 }

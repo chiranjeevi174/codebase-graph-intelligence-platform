@@ -35,7 +35,7 @@ class BaseLLMProvider(ABC):
     @property
     @abstractmethod
     def provider_name(self) -> str:
-        """Return provider identifier name (e.g. groq, gemini, openai)."""
+        """Return provider identifier name (e.g. openai)."""
 
     @property
     @abstractmethod

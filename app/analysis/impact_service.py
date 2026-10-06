@@ -62,6 +62,7 @@ class CodeImpactAnalysisService:
             symbol_name_or_qn=target_qn,
             max_hops=request.max_hops,
             limit=request.max_relationships,
+            repository_id=request.repository_id,
         )
 
         # 3. Transitive Downstream Dependencies (What target depends on?)
@@ -69,13 +70,14 @@ class CodeImpactAnalysisService:
             symbol_name_or_qn=target_qn,
             max_hops=request.max_hops,
             limit=request.max_relationships,
+            repository_id=request.repository_id,
         )
 
-        # 4. Process Direct vs Transitive Impact
-        direct_dependents: list[ImpactNode] = []
-        transitive_dependents: list[ImpactNode] = []
-        direct_dependencies: list[ImpactNode] = []
-        transitive_dependencies: list[ImpactNode] = []
+        # 4. Process Direct vs Transitive Impact with deterministic deduplication
+        direct_dependents_map: dict[str, ImpactNode] = {}
+        transitive_dependents_map: dict[str, ImpactNode] = {}
+        direct_dependencies_map: dict[str, ImpactNode] = {}
+        transitive_dependencies_map: dict[str, ImpactNode] = {}
 
         impact_paths: list[ImpactPath] = []
         affected_files_set: set[str] = set()
@@ -96,6 +98,9 @@ class CodeImpactAnalysisService:
             raw_qn = rec.get("qualified_name") or rec.get("name") or raw_name
             name = str(raw_name)
             qn = str(raw_qn)
+            if qn == target_qn:
+                continue
+
             fpath = str(rec.get("file_path") or "unknown")
             hop = int(rec.get("hop_count", 1))
             rel_types = rec.get("rel_types", ["DEPENDS_ON"])
@@ -119,9 +124,10 @@ class CodeImpactAnalysisService:
             )
 
             if hop == 1:
-                direct_dependents.append(node)
-            else:
-                transitive_dependents.append(node)
+                direct_dependents_map[qn] = node
+            elif qn not in direct_dependents_map:
+                if qn not in transitive_dependents_map or hop < transitive_dependents_map[qn].hop_count:
+                    transitive_dependents_map[qn] = node
 
             # Build ImpactPath
             path_nodes = rec.get("path_nodes") or [qn, target_qn]
@@ -136,6 +142,13 @@ class CodeImpactAnalysisService:
                 )
             )
 
+        # Remove any direct dependents from transitive map
+        for direct_qn in direct_dependents_map:
+            transitive_dependents_map.pop(direct_qn, None)
+
+        direct_dependents = list(direct_dependents_map.values())
+        transitive_dependents = list(transitive_dependents_map.values())
+
         # Process Downstream Dependencies
         for rec in raw_dependencies:
             labels = rec.get("labels", ["Symbol"])
@@ -144,6 +157,9 @@ class CodeImpactAnalysisService:
             raw_qn = rec.get("qualified_name") or rec.get("name") or raw_name
             name = str(raw_name)
             qn = str(raw_qn)
+            if qn == target_qn:
+                continue
+
             fpath = str(rec.get("file_path") or "unknown")
             hop = int(rec.get("hop_count", 1))
             rel_types = rec.get("rel_types", ["DEPENDS_ON"])
@@ -167,9 +183,17 @@ class CodeImpactAnalysisService:
             )
 
             if hop == 1:
-                direct_dependencies.append(node)
-            else:
-                transitive_dependencies.append(node)
+                direct_dependencies_map[qn] = node
+            elif qn not in direct_dependencies_map:
+                if qn not in transitive_dependencies_map or hop < transitive_dependencies_map[qn].hop_count:
+                    transitive_dependencies_map[qn] = node
+
+        # Remove any direct dependencies from transitive map
+        for direct_qn in direct_dependencies_map:
+            transitive_dependencies_map.pop(direct_qn, None)
+
+        direct_dependencies = list(direct_dependencies_map.values())
+        transitive_dependencies = list(transitive_dependencies_map.values())
 
         # 5. Aggregate Structural Metrics (ImpactSummary)
         summary = ImpactSummary(

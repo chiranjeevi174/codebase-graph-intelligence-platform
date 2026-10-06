@@ -47,7 +47,7 @@ Unlike generic "chat-with-code" tools that perform simple textual search over te
                                          v
                     +--------------------+---------------------+
                     |     Provider-Agnostic LLM Layer          |
-                    |     [Groq | Gemini | OpenAI Stub]        |
+                    |     [OpenAI Production Provider]         |
                     +------------------------------------------+
 ```
 
@@ -63,7 +63,7 @@ Unlike generic "chat-with-code" tools that perform simple textual search over te
 | **Vector Database** | Qdrant | Vector store for symbol-aware code chunk embeddings |
 | **Embeddings** | Hugging Face (`BAAI/bge-small-en-v1.5`) | Local, LLM-independent 384-dim code vectorizer |
 | **Orchestration** | LangGraph | State graph engine for multi-node Graph RAG workflow |
-| **LLM Provider** | Groq (Default), Gemini, OpenAI | Provider-agnostic LLM abstraction layer |
+| **LLM Provider** | OpenAI (Production) | Provider-agnostic LLM abstraction layer |
 | **Backend API** | FastAPI + Uvicorn | RESTful API server |
 
 ---
@@ -111,16 +111,12 @@ QDRANT_URL="http://localhost:6333"
 # Embeddings
 EMBEDDING_MODEL="BAAI/bge-small-en-v1.5"
 
-# LLM Provider Selection (groq | gemini | openai)
-LLM_PROVIDER="groq"
+# LLM Provider Selection (openai)
+LLM_PROVIDER="openai"
 
 # API Keys
-GROQ_API_KEY="your-groq-api-key"
-GROQ_MODEL="llama-3.3-70b-versatile"
-GEMINI_API_KEY="your-gemini-api-key"
-GEMINI_MODEL="gemini-2.5-flash"
 OPENAI_API_KEY="your-openai-api-key"
-OPENAI_MODEL="gpt-4o"
+OPENAI_MODEL="gpt-4o-mini"
 ```
 
 ---
@@ -192,17 +188,13 @@ Access Interactive API Documentation:
 
 ## 🎯 LLM Provider Abstraction
 
-Switching LLM providers is completely seamless and zero-code. Set `LLM_PROVIDER` in your `.env` or environment:
+The project uses a clean provider-agnostic LLM abstraction (`BaseLLMProvider`) powered canonical OpenAI implementation. Configure `LLM_PROVIDER` in your `.env` or environment:
 
 ```bash
-# Use Groq
-LLM_PROVIDER=groq
-
-# Switch to Gemini
-LLM_PROVIDER=gemini
-
-# Switch to OpenAI
+# Production OpenAI Provider
 LLM_PROVIDER=openai
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=gpt-4o-mini
 ```
 
 The underlying Graph RAG reasoning pipeline automatically calls `get_llm()`, maintaining full independence between graph reasoning, embedding generation, and LLM text generation.

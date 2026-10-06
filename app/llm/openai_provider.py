@@ -17,7 +17,7 @@ class OpenAIProvider(BaseLLMProvider):
     def __init__(self, api_key: str | None = None, model: str | None = None, settings: Settings | None = None):
         super().__init__(settings=settings)
         self.settings = settings or get_settings()
-        self.api_key = api_key or self.settings.OPENAI_API_KEY
+        self.api_key = self.settings.OPENAI_API_KEY if api_key is None else api_key
         self._model = model or self.settings.OPENAI_MODEL
         self._client: OpenAI | None = None
         self._async_client: AsyncOpenAI | None = None
