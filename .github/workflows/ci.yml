@@ -27,21 +27,21 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install uv package manager
-        run: curl -sSf https://astral.sh/uv/install.sh | sh
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
 
       - name: Install dependencies
-        run: |
-          uv pip install --system -e .
-          uv pip install --system pytest pytest-asyncio pytest-cov ruff
+        run: uv sync --locked
 
       - name: Code Quality & Linting
         run: |
-          ruff check app/ scripts/ tests/
+          uv run ruff check app scripts tests
+          uv run ruff format --check app scripts tests
 
       - name: Execute Pytest Suite
         env:
           REDIS_URL: redis://localhost:6379
           ENVIRONMENT: test
-        run: |
-          pytest tests/ -v
+        run: uv run pytest -q
