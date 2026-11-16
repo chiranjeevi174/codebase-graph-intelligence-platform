@@ -2,8 +2,17 @@
 
 from fastapi import APIRouter, HTTPException
 
+from app.analysis.architecture_service import ArchitectureIntelligenceService
 from app.analysis.impact_service import CodeImpactAnalysisService
-from app.models.entities import ImpactAnalysisRequest, ImpactAnalysisResult
+from app.analysis.quality_security_service import CodeQualitySecurityService
+from app.models.entities import (
+    ArchitectureAnalysisRequest,
+    ArchitectureAnalysisResult,
+    ImpactAnalysisRequest,
+    ImpactAnalysisResult,
+    QualitySecurityAnalysisRequest,
+    QualitySecurityAnalysisResult,
+)
 
 router = APIRouter(tags=["Analysis"])
 
@@ -61,13 +70,37 @@ def analyze_api_flow(request: ApiFlowAnalysisRequest):
         raise HTTPException(status_code=500, detail=f"API flow analysis failed: {e}")
 
 
+@router.post("/analysis/architecture", response_model=ArchitectureAnalysisResult)
+def analyze_architecture(request: ArchitectureAnalysisRequest):
+    """Analyze repository architecture, package hierarchy, cross-module dependencies, and layers."""
+    try:
+        service = ArchitectureIntelligenceService()
+        return service.analyze_architecture(request)
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001 # FastAPI 500 boundary
+        raise HTTPException(status_code=500, detail=f"Architecture analysis failed: {e}")
+
+
+@router.post("/analysis/quality-security", response_model=QualitySecurityAnalysisResult)
+def analyze_quality_security(request: QualitySecurityAnalysisRequest):
+    """Analyze code quality smells, maintainability, and security vulnerabilities with credential masking."""
+    try:
+        service = CodeQualitySecurityService()
+        return service.analyze(request)
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001 # FastAPI 500 boundary
+        raise HTTPException(status_code=500, detail=f"Quality and security analysis failed: {e}")
+
+
 from app.diff.diff_analyzer import StructuralDiffAnalyzer
 from app.diff.diff_models import ChangeImpactResult, DiffRequest
 
 
-@router.post("/analysis/diff", response_model=ChangeImpactResult)
+@router.post("/analysis/diff", response_model=ChangeImpactResult, include_in_schema=False)
 def analyze_structural_diff(request: DiffRequest):
-    """Analyze structural Git diff, symbol changes, signature changes, and affected graph components."""
+    """Internal structural Git diff analysis endpoint retained for PR pipeline compatibility."""
     try:
         analyzer = StructuralDiffAnalyzer()
         result = analyzer.analyze_diff(request)

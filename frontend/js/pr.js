@@ -231,8 +231,8 @@ export async function handlePRSubmit() {
             <span>PR #${response.pr_number} Analysis (${escapeHtml(response.provider).toUpperCase()})</span>
             <span class="tag tag-emerald">Job: ${escapeHtml(jobId)}</span>
           </div>
-          <div style="font-size:13px; color:var(--text-secondary); line-height:1.5;">
-            ${escapeHtml(response.explanation || 'Pull request structural analysis compiled.')}
+          <div style="font-size:13px; color:var(--text-secondary); line-height:1.55;">
+            ${renderMarkdown(response.explanation || 'Pull request structural analysis compiled.')}
           </div>
           <table class="kv-table">
             <tr><td class="kv-key">Job ID</td><td class="kv-val">${escapeHtml(jobId)}</td></tr>
@@ -296,6 +296,18 @@ export async function handlePRSubmit() {
       prBtn.innerHTML = `Analyze Pull Request`;
     }
   }
+}
+
+function renderMarkdown(text) {
+  if (!text) return "";
+  let out = escapeHtml(text);
+  out = out.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+  out = out.replace(/^### (.*?)$/gm, "<h3 style='color:var(--text-primary); font-size:13px; margin:10px 0 4px;'>$1</h3>");
+  out = out.replace(/^## (.*?)$/gm, "<h2 style='color:var(--text-primary); font-size:14px; margin:12px 0 6px;'>$1</h2>");
+  out = out.replace(/`([^`]+)`/g, "<code>$1</code>");
+  out = out.replace(/^- (.*?)$/gm, "<li style='margin-left:18px;'>$1</li>");
+  out = out.replace(/\n\n/g, "<br><br>");
+  return out;
 }
 
 function escapeHtml(text) {

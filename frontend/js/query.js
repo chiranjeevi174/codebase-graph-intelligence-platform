@@ -54,6 +54,11 @@ export function initQueryView() {
   state.subscribe((event, data) => {
     if (event === "repo_changed") {
       renderRepositorySuggestions(data);
+    } else if (event === "query_response_updated") {
+      const resultsContainer = document.getElementById("query-results") || document.getElementById("answer-container");
+      if (resultsContainer && data && resultsContainer.innerHTML.includes("Submit a question above")) {
+        renderQueryResponse(data, resultsContainer);
+      }
     }
   });
 }
@@ -175,14 +180,140 @@ function adaptGraphPaths(graphPaths) {
   return { nodes, relationships };
 }
 
+/**
+ * Render complete structured Grounded Answer card into target container.
+ */
+export function renderQueryResponse(response, container) {
+  if (!container || !response) return;
+
+  const answer = response.answer && response.answer.trim()
+    ? renderMarkdown(response.answer)
+    : `<em style="color:var(--text-muted)">No answer could be generated from the available codebase context.</em>`;
+
+  const confPercent = Math.round((typeof response.confidence === "number" ? response.confidence : 0.8) * 100);
+  const confTag = `<span class="tag tag-purple" data-tooltip-title="Answer Confidence" data-tooltip-body="Calculated based on AST evidence verification and reciprocal rank fusion">Confidence: ${confPercent}%</span>`;
+
+  let validationBadgeHtml = "";
+  if (response.validation_status) {
+    validationBadgeHtml = `
+      <span id="validation-badge" class="status-badge" data-tooltip-title="Grounded Evidence Validated" data-tooltip-body="All cited file paths and symbols verified against indexed codebase context">
+        <span class="status-dot"></span> Grounded Evidence Validated
+      </span>
+    `;
+  } else {
+    const errors = Array.isArray(response.validation_errors) && response.validation_errors.length > 0
+      ? response.validation_errors
+      : ["Potentially unverified claims or citations detected"];
+    const summaryText = errors.length === 1 ? errors[0] : `${errors.length} ungrounded citation(s): ${errors.join("; ")}`;
+    validationBadgeHtml = `
+      <span id="validation-badge" class="status-badge warning" data-tooltip-title="Grounding Notice" data-tooltip-body="${escapeAttr(errors.join("\n"))}">
+        <span class="status-dot"></span> Grounding Notice: ${escapeHtml(summaryText)}
+      </span>
+    `;
+  }
+
+  const sources = Array.isArray(response.sources) ? response.sources : [];
+  let sourcesSectionHtml = "";
+  if (sources.length > 0) {
+    const pills = sources
+      .map(
+        (src) => `
+      <button type="button" class="source-pill" data-source="${escapeAttr(src)}" title="Click to inspect code at ${escapeAttr(src)}">
+        📄 ${escapeHtml(src)}
+      </button>
+    `
+      )
+      .join("");
+
+    sourcesSectionHtml = `
+      <div class="sources-section">
+        <div class="sources-header">VERIFIED CODEBASE CITATIONS (${sources.length})</div>
+        <div id="sources-list" class="sources-list">
+          ${pills}
+        </div>
+      </div>
+    `;
+  } else {
+    sourcesSectionHtml = `
+      <div class="sources-section">
+        <div class="sources-header">VERIFIED CODEBASE CITATIONS</div>
+        <div id="sources-list" class="sources-list">
+          <span style="color:var(--text-muted); font-size:12px;">No direct file citations returned for this query.</span>
+        </div>
+      </div>
+    `;
+  }
+
+  const debugTrace = response.debug_info || response.retrieval_trace;
+  let debugTraceHtml = "";
+  if (debugTrace) {
+    const resolvedEntities = Array.isArray(debugTrace.resolved_entities)
+      ? debugTrace.resolved_entities.join(", ")
+      : "None";
+    const graphCount = debugTrace.graph_results_count || 0;
+    const semanticCount = debugTrace.semantic_results_count || 0;
+    const fusedCount = Array.isArray(debugTrace.fused_results)
+      ? debugTrace.fused_results.length
+      : debugTrace.fused_results_count || 0;
+    const pathCount =
+      debugTrace.subgraph_stats && debugTrace.subgraph_stats.nodes != null
+        ? `${debugTrace.subgraph_stats.nodes} nodes, ${debugTrace.subgraph_stats.edges || 0} edges`
+        : Array.isArray(response.graph_paths)
+        ? `${response.graph_paths.length} paths`
+        : "0 paths";
+
+    debugTraceHtml = `
+      <details style="margin-top:8px; border-top:1px solid var(--border-color); padding-top:8px;">
+        <summary style="font-size:11.5px; font-weight:600; color:var(--text-muted); cursor:pointer; user-select:none;">
+          RETRIEVAL & REASONING TRACE
+        </summary>
+        <div id="debug-trace-container" style="font-size:12px; font-family:var(--font-mono); color:var(--text-secondary); display:flex; flex-direction:column; gap:6px; margin-top:8px; padding:10px; background:var(--bg-elevated); border-radius:var(--radius-md);">
+          <div><strong>Query Intent:</strong> ${escapeHtml(debugTrace.query_intent || response.intent || "N/A")}</div>
+          <div><strong>Resolved Entities:</strong> ${escapeHtml(resolvedEntities || "None")}</div>
+          <div><strong>Graph Matches:</strong> ${graphCount}</div>
+          <div><strong>Semantic Vector Matches:</strong> ${semanticCount}</div>
+          <div><strong>Fused RRF Results:</strong> ${fusedCount}</div>
+          <div><strong>Subgraph Paths:</strong> ${pathCount}</div>
+        </div>
+      </details>
+    `;
+  }
+
+  container.innerHTML = `
+    <div id="answer-container" class="answer-box card">
+      <div class="answer-header">
+        <div class="answer-title-group">
+          <span class="answer-title">Grounded Answer</span>
+          <span class="tag tag-blue">Graph RAG + RRF</span>
+          ${confTag}
+          ${validationBadgeHtml}
+        </div>
+      </div>
+
+      <div id="answer-text" class="answer-content">
+        ${answer}
+      </div>
+
+      ${sourcesSectionHtml}
+      ${debugTraceHtml}
+    </div>
+  `;
+
+  // Attach interactive click listeners to source pills for code inspection modal
+  container.querySelectorAll(".source-pill").forEach((pill) => {
+    pill.addEventListener("click", () => {
+      const src = pill.dataset.source;
+      if (src) {
+        state.setSelectedSource(src);
+      }
+    });
+  });
+}
+
 export async function handleQuerySubmit() {
   const queryInput = document.getElementById("query-input");
   const queryBtn = document.getElementById("btn-run-query");
-  const answerContainer = document.getElementById("answer-container");
-  const answerText = document.getElementById("answer-text");
-  const validationBadge = document.getElementById("validation-badge");
-  const sourcesContainer = document.getElementById("sources-list");
-  const debugTraceContainer = document.getElementById("debug-trace-container");
+  const resultsContainer = document.getElementById("query-results") || document.getElementById("answer-container");
 
   const question = queryInput ? queryInput.value.trim() : "";
   if (!question) return;
@@ -192,10 +323,19 @@ export async function handleQuerySubmit() {
     queryBtn.disabled = true;
     queryBtn.innerHTML = `<span class="spinner"></span> Reasoning over graph...`;
   }
-  if (answerText) {
-    answerText.innerHTML = `<em style="color:var(--text-muted)">Running Graph RAG multi-hop reasoning & retrieval...</em>`;
+  if (resultsContainer) {
+    resultsContainer.innerHTML = `
+      <div class="card" style="display:flex; align-items:center; gap:14px; padding:24px;">
+        <span class="spinner" style="width:20px; height:20px; border-width:2px;"></span>
+        <div>
+          <div style="font-weight:600; color:var(--text-primary); font-size:13.5px;">Reasoning over codebase graph & vector indexes...</div>
+          <div style="font-size:12px; color:var(--text-secondary); margin-top:3px;">
+            Executing multi-hop retrieval, reciprocal rank fusion, and grounded answer synthesis.
+          </div>
+        </div>
+      </div>
+    `;
   }
-  if (answerContainer) answerContainer.style.display = "flex";
 
   try {
     const payload = {
@@ -211,41 +351,9 @@ export async function handleQuerySubmit() {
     const response = await executeQuery(payload);
     state.setQueryResponse(response);
 
-    // Display Grounded Answer
-    if (answerText) {
-      answerText.textContent = response.answer || "No answer generated.";
-    }
-
-    // Display Groundedness Validation Status
-    if (validationBadge) {
-      if (response.validation_status) {
-        validationBadge.className = "status-badge";
-        validationBadge.innerHTML = `<span class="status-dot"></span> Grounded Evidence Validated`;
-      } else {
-        validationBadge.className = "status-badge warning";
-        const errorText = response.validation_errors ? response.validation_errors.join("; ") : "Ungrounded claims detected";
-        validationBadge.innerHTML = `<span class="status-dot"></span> Validation Warning: ${escapeHtml(errorText)}`;
-      }
-    }
-
-    // Render Sources as Clickable Interactive Pills
-    if (sourcesContainer) {
-      sourcesContainer.innerHTML = "";
-      if (response.sources && response.sources.length > 0) {
-        response.sources.forEach((src) => {
-          const pill = document.createElement("button");
-          pill.type = "button";
-          pill.className = "source-pill";
-          pill.textContent = src;
-          pill.title = `Click to inspect code at ${src}`;
-          pill.addEventListener("click", () => {
-            state.setSelectedSource(src);
-          });
-          sourcesContainer.appendChild(pill);
-        });
-      } else {
-        sourcesContainer.innerHTML = `<span style="color:var(--text-muted); font-size:12px;">No direct sources cited in response</span>`;
-      }
+    // Render Answer and citations into resultsContainer
+    if (resultsContainer) {
+      renderQueryResponse(response, resultsContainer);
     }
 
     // Render Subgraph visualization if present
@@ -255,37 +363,75 @@ export async function handleQuerySubmit() {
         updateGraphData(graphData);
       }
     }
-
-    // Debug Trace Panel
-    if (debugTraceContainer) {
-      if (response.retrieval_trace) {
-        const trace = response.retrieval_trace;
-        debugTraceContainer.innerHTML = `
-          <div style="font-size:12px; font-family:var(--font-mono); color:var(--text-secondary); display:flex; flex-direction:column; gap:6px;">
-            <div><strong>Query Intent:</strong> ${escapeHtml(trace.query_intent || 'N/A')}</div>
-            <div><strong>Resolved Entities:</strong> ${escapeHtml((trace.resolved_entities || []).join(', ') || 'None')}</div>
-            <div><strong>Graph Matches:</strong> ${trace.graph_results_count || 0}</div>
-            <div><strong>Semantic Vector Matches:</strong> ${trace.semantic_results_count || 0}</div>
-            <div><strong>Fused RRF Results:</strong> ${trace.fused_results_count || 0}</div>
-            <div><strong>Subgraph Paths:</strong> ${trace.subgraph_paths_count || 0}</div>
-          </div>
-        `;
-      }
-    }
   } catch (err) {
     console.error("GRAPH RAG QUERY ERROR:", err);
-    if (answerText) {
-      answerText.innerHTML = `<span style="color:var(--accent-rose)">Error executing query: ${escapeHtml(err.message)}</span>`;
+    if (resultsContainer) {
+      resultsContainer.innerHTML = `
+        <div class="card" style="border-color: rgba(251, 113, 133, 0.3); background: rgba(251, 113, 133, 0.05); padding:16px;">
+          <div class="card-title" style="color:var(--accent-rose);">
+            <span>Query Execution Error</span>
+            <span class="tag tag-rose">Failed</span>
+          </div>
+          <div style="font-size:13px; color:var(--text-secondary); line-height:1.55; margin-top:8px;">
+            ${escapeHtml(err.message || "An unexpected error occurred while executing the Graph RAG query.")}
+          </div>
+        </div>
+      `;
     }
   } finally {
     if (queryBtn) {
       queryBtn.disabled = false;
-      queryBtn.innerHTML = `Send Question`;
+      queryBtn.innerHTML = `Run Codebase Query`;
     }
   }
 }
 
-function escapeHtml(text) {
+export function renderMarkdown(text) {
+  if (!text) return "";
+  let out = escapeHtml(text);
+
+  // Fenced code blocks with language support
+  out = out.replace(/```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g, (match, lang, code) => {
+    return `<pre style="background:var(--bg-elevated); border:1px solid var(--border-color); border-radius:var(--radius-md); padding:10px 14px; margin:10px 0; overflow-x:auto; font-family:var(--font-mono); font-size:12px; line-height:1.5; color:var(--text-primary); white-space:pre;"><code>${code.trim()}</code></pre>`;
+  });
+
+  // Inline code
+  out = out.replace(/`([^`]+)`/g, "<code>$1</code>");
+
+  // Bold
+  out = out.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+
+  // Headings
+  out = out.replace(
+    /^#### (.*?)$/gm,
+    "<h4 style='color:var(--text-primary); font-size:13px; font-weight:600; margin:12px 0 4px;'>$1</h4>"
+  );
+  out = out.replace(
+    /^### (.*?)$/gm,
+    "<h3 style='color:var(--text-primary); font-size:14px; font-weight:600; margin:14px 0 6px;'>$1</h3>"
+  );
+  out = out.replace(
+    /^## (.*?)$/gm,
+    "<h2 style='color:var(--text-primary); font-size:15px; font-weight:700; margin:16px 0 8px;'>$1</h2>"
+  );
+
+  // Unordered lists
+  out = out.replace(/^- (.*?)$/gm, "<li style='margin-left:18px; margin-bottom:4px; list-style-type:disc;'>$1</li>");
+
+  // Numbered lists
+  out = out.replace(
+    /^\d+\.\s+(.*?)$/gm,
+    "<li style='margin-left:18px; margin-bottom:4px; list-style-type:decimal;'>$1</li>"
+  );
+
+  // Paragraph breaks
+  out = out.replace(/\n\n/g, "<div style='height:8px;'></div>");
+  out = out.replace(/\n/g, "<br>");
+
+  return out;
+}
+
+export function escapeHtml(text) {
   if (!text) return "";
   return String(text)
     .replace(/&/g, "&amp;")
@@ -295,7 +441,7 @@ function escapeHtml(text) {
     .replace(/'/g, "&#039;");
 }
 
-function escapeAttr(text) {
+export function escapeAttr(text) {
   if (!text) return "";
   return String(text).replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 }

@@ -11,16 +11,19 @@ class AppState {
     this.healthStatus = null;
     this.repositories = [];
 
-    this.activeTab = "query"; // 'query' | 'impact' | 'api-flow' | 'diff'
+    this.activeTab = "query"; // 'query' | 'impact' | 'apiflow' | 'pr' | 'architecture' | 'quality-security'
 
     this.currentQueryResponse = null;
     this.currentGraphData = null;
     this.currentImpactResult = null;
     this.currentApiFlowResult = null;
-    this.currentDiffResult = null;
+    this.currentPRResult = null;
+    this.currentArchitectureResult = null;
+    this.currentQualitySecurityResult = null;
 
     this.selectedNode = null;
     this.selectedSource = null;
+    this.selectedFinding = null;
 
     this.listeners = new Set();
   }
@@ -76,9 +79,24 @@ class AppState {
     this.notify("api_flow_updated", apiFlow);
   }
 
-  setDiffResult(diff) {
-    this.currentDiffResult = diff;
-    this.notify("diff_updated", diff);
+  setPRResult(prResult) {
+    this.currentPRResult = prResult;
+    this.notify("pr_updated", prResult);
+  }
+
+  setArchitectureResult(archResult) {
+    this.currentArchitectureResult = archResult;
+    this.notify("architecture_updated", archResult);
+  }
+
+  setQualitySecurityResult(qsResult) {
+    this.currentQualitySecurityResult = qsResult;
+    this.notify("quality_security_updated", qsResult);
+  }
+
+  setSelectedFinding(finding) {
+    this.selectedFinding = finding;
+    this.notify("finding_selected", finding);
   }
 
   setSelectedNode(node) {

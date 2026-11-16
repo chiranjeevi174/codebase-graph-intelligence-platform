@@ -74,15 +74,28 @@ export async function analyzeApiFlow(payload) {
   return await res.json();
 }
 
-export async function analyzeStructuralDiff(payload) {
-  const res = await fetch(`${API_BASE}/analysis/diff`, {
+export async function analyzeArchitecture(payload) {
+  const res = await fetch(`${API_BASE}/analysis/architecture`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
     const errData = await res.json().catch(() => ({}));
-    throw new Error(errData.detail || `Structural diff failed: ${res.statusText}`);
+    throw new Error(errData.detail || `Architecture analysis failed: ${res.statusText}`);
+  }
+  return await res.json();
+}
+
+export async function analyzeQualitySecurity(payload) {
+  const res = await fetch(`${API_BASE}/analysis/quality-security`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.detail || `Quality & Security analysis failed: ${res.statusText}`);
   }
   return await res.json();
 }

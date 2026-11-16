@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from app.models.entities import GraphRAGResponse
+from app.utils.logger import logger
 from app.workflows.graph_rag import GraphRAGPipeline
 
 router = APIRouter(tags=["Query"])
@@ -22,6 +23,8 @@ class QueryRequest(BaseModel):
 @router.post("/query", response_model=GraphRAGResponse)
 def execute_query(request: QueryRequest):
     """Execute Graph RAG multi-hop graph reasoning workflow over codebase."""
+    sanitized_q = request.question.strip()[:100]
+    logger.info(f"[QueryAPI] Received query request: '{sanitized_q}' (repo_id={request.repository_id})")
     try:
         pipeline = GraphRAGPipeline()
         response = pipeline.run(
@@ -33,8 +36,14 @@ def execute_query(request: QueryRequest):
             max_hops=request.max_hops,
             debug=request.debug,
         )
+        logger.info(
+            f"[QueryAPI] Query response prepared. validation_status={response.validation_status} "
+            f"errors={len(response.validation_errors)} sources={len(response.sources)} "
+            f"paths={len(response.graph_paths)}"
+        )
         return response
     except HTTPException:
         raise
     except Exception as e:  # noqa: BLE001 # FastAPI 500 error boundary
+        logger.error(f"[QueryAPI] Query execution failed: {e}")
         raise HTTPException(status_code=500, detail=f"Graph RAG query execution failed: {e}")

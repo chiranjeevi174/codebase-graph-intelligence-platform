@@ -5,7 +5,7 @@
  */
 
 import { fetchGraphData, fetchHealthStatus, fetchRepositories, fetchSourceCode, ingestRepository } from "./api.js";
-import { initDiffView } from "./diff.js";
+import { initArchitectureView } from "./architecture.js";
 import {
   closeGraphFullscreen,
   fsResetZoom,
@@ -21,6 +21,7 @@ import {
 } from "./graph.js";
 import { initImpactView } from "./impact.js";
 import { initPRView } from "./pr.js";
+import { initQualitySecurityView } from "./quality_security.js";
 import { initQueryView, renderRepositorySuggestions } from "./query.js";
 import { state } from "./state.js";
 
@@ -33,8 +34,9 @@ export function initUI() {
 
   initQueryView();
   initImpactView();
-  initDiffView();
   initPRView();
+  initArchitectureView();
+  initQualitySecurityView();
 
   // Subscribe to state events
   state.subscribe((event, data) => handleStateEvent(event, data));
@@ -375,8 +377,82 @@ function handleStateEvent(event, data) {
     loadCurrentRepoGraph();
   } else if (event === "node_selected") {
     renderRightPanelNodeDetails(data);
+  } else if (event === "finding_selected") {
+    renderRightPanelFindingDetails(data);
   } else if (event === "source_selected") {
     openSourceModal(data);
+  }
+}
+
+/**
+ * Render Finding details in Right Inspector Panel.
+ */
+function renderRightPanelFindingDetails(finding) {
+  const panel = document.getElementById("node-details-container");
+  if (!panel || !finding) return;
+
+  const sevClass =
+    finding.severity === "Critical"
+      ? "tag-rose"
+      : finding.severity === "High"
+      ? "tag-amber"
+      : finding.severity === "Medium"
+      ? "tag-yellow"
+      : "tag-blue";
+
+  const lineRange = finding.line_number != null ? `L${finding.line_number}` : "—";
+
+  panel.innerHTML = `
+    <div class="card inspector-card">
+      <div class="card-title">
+        <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeAttr(finding.title)}">${escapeHtml(finding.title)}</span>
+        <span class="tag ${sevClass}">${escapeHtml(finding.severity)}</span>
+      </div>
+      <table class="kv-table">
+        <tr>
+          <td class="kv-key">Category</td>
+          <td class="kv-val"><span class="tag ${finding.category === 'security' ? 'tag-purple' : 'tag-emerald'}">${escapeHtml(finding.category.toUpperCase())}</span></td>
+        </tr>
+        <tr>
+          <td class="kv-key">Rule ID</td>
+          <td class="kv-val"><code>${escapeHtml(finding.rule_id)}</code></td>
+        </tr>
+        <tr>
+          <td class="kv-key">File Path</td>
+          <td class="kv-val">
+            <a href="#" id="inspector-finding-file-link" style="color:var(--accent-blue); text-decoration:underline; cursor:pointer;" title="Click to open source code">${escapeHtml(finding.file_path)}</a>
+          </td>
+        </tr>
+        <tr>
+          <td class="kv-key">Location</td>
+          <td class="kv-val">${escapeHtml(lineRange)}</td>
+        </tr>
+        <tr>
+          <td class="kv-key">Confidence</td>
+          <td class="kv-val">${escapeHtml(finding.confidence || 'High')}</td>
+        </tr>
+      </table>
+
+      <div style="margin-top:12px; font-size:12px; color:var(--text-secondary); line-height:1.45;">
+        ${escapeHtml(finding.explanation)}
+      </div>
+
+      <div style="margin-top:10px; font-size:12px; background:rgba(251,113,133,0.06); border-left:3px solid var(--accent-rose); padding:6px 10px; border-radius:0 4px 4px 0; color:var(--text-secondary);">
+        <strong style="color:var(--accent-rose);">Impact:</strong> ${escapeHtml(finding.why_it_matters)}
+      </div>
+
+      <div style="margin-top:8px; font-size:12px; background:rgba(45,212,191,0.06); border-left:3px solid var(--accent-emerald); padding:6px 10px; border-radius:0 4px 4px 0; color:var(--text-secondary);">
+        <strong style="color:var(--accent-emerald);">Remediation:</strong> ${escapeHtml(finding.suggested_remediation)}
+      </div>
+    </div>
+  `;
+
+  const link = document.getElementById("inspector-finding-file-link");
+  if (link && finding.file_path) {
+    link.addEventListener("click", (e) => {
+      e.preventDefault();
+      openSourceModal(finding.file_path, finding.line_number || 1, finding.end_line || finding.line_number || 1);
+    });
   }
 }
 
@@ -442,6 +518,12 @@ function renderRightPanelNodeDetails(node) {
           <td class="kv-key">Node Type</td>
           <td class="kv-val">${escapeHtml(nodeType)}</td>
         </tr>
+        ${node.layer ? `
+        <tr>
+          <td class="kv-key">Architecture Layer</td>
+          <td class="kv-val"><span class="tag tag-cyan">${escapeHtml(node.layer)}</span></td>
+        </tr>
+        ` : ""}
         <tr>
           <td class="kv-key">Qualified Name</td>
           <td class="kv-val" style="word-break:break-all;">${escapeHtml(qualifiedName)}</td>

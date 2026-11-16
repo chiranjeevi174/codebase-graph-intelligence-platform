@@ -22,7 +22,26 @@ def test_static_frontend_index_serving():
     """Verify frontend HTML root page is served cleanly at /."""
     response = client.get("/")
     assert response.status_code == 200
-    assert "Developer UI" in response.text or "<!DOCTYPE html>" in response.text
+    assert "Code Graph Intelligence" in response.text or "<!DOCTYPE html>" in response.text
+
+
+def test_frontend_navigation_six_primary_features():
+    """Verify the frontend HTML navigation reflects exactly the six primary features and excludes standalone diff."""
+    response = client.get("/")
+    assert response.status_code == 200
+    html = response.text
+
+    # Verify the six primary feature tabs exist in navigation
+    assert 'data-tab="query"' in html
+    assert 'data-tab="impact"' in html
+    assert 'data-tab="apiflow"' in html
+    assert 'data-tab="pr"' in html
+    assert 'data-tab="architecture"' in html
+    assert 'data-tab="quality-security"' in html
+
+    # Verify standalone Structural Git Diff tab has been removed
+    assert 'data-tab="diff"' not in html
+    assert 'id="view-diff"' not in html
 
 
 def test_source_code_retrieval_endpoint():
@@ -53,3 +72,29 @@ def test_graph_summary_endpoint_extended():
     assert "nodes" in data
     assert "relationships" in data
     assert "metadata" in data
+
+
+def test_query_view_dom_elements_present():
+    """Verify that index.html contains the necessary DOM elements for Codebase Query."""
+    response = client.get("/")
+    assert response.status_code == 200
+    html = response.text
+    assert 'id="view-query"' in html
+    assert 'id="query-input"' in html
+    assert 'id="btn-run-query"' in html
+    assert 'id="query-results"' in html
+    assert 'id="query-suggestions-list"' in html
+
+
+def test_query_js_module_targets_results_container():
+    """Verify frontend/js/query.js references query-results and exports renderQueryResponse."""
+    with open("frontend/js/query.js", encoding="utf-8") as f:
+        content = f.read()
+
+    assert 'document.getElementById("query-results")' in content
+    assert "export function renderQueryResponse" in content
+    assert "renderQueryResponse(response, resultsContainer)" in content
+    assert "answer-container" in content
+    assert "answer-text" in content
+    assert "validation-badge" in content
+    assert "sources-list" in content

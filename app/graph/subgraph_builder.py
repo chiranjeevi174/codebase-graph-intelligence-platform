@@ -52,7 +52,14 @@ class SubgraphBuilder:
         hops = max(1, min(max_hops, 5))
         query = f"""
         MATCH path = (center)-[r*1..{hops}]-(neighbor)
-        WHERE center.name = $id OR center.qualified_name = $id OR center.symbol_id = $id
+        WHERE center.name = $id 
+           OR center.qualified_name = $id 
+           OR center.symbol_id = $id
+           OR center.file_path = $id
+           OR center.relative_path = $id
+           OR center.file_id = $id
+           OR toLower(center.name) = toLower($id)
+           OR toLower(center.qualified_name) = toLower($id)
         RETURN nodes(path) AS nodes, relationships(path) AS relationships
         LIMIT {max_relationships}
         """
@@ -70,14 +77,21 @@ class SubgraphBuilder:
 
                 path_node_objs: list[GraphNode] = []
                 for n in path_nodes:
-                    node_id = str(n.get("symbol_id") or n.get("file_id") or n.get("name") or id(n))
+                    node_id = str(
+                        n.get("symbol_id") or n.get("file_id") or n.get("name") or n.get("file_path") or id(n)
+                    )
+                    n_labels = (
+                        list(n.labels)
+                        if hasattr(n, "labels")
+                        else (n.get("labels") if isinstance(n.get("labels"), list) else ["Symbol"])
+                    )
                     if len(nodes_dict) < max_nodes and node_id not in nodes_dict:
                         nodes_dict[node_id] = SubgraphNode(
                             id=node_id,
-                            name=n.get("name", "Unknown"),
-                            qualified_name=n.get("qualified_name"),
-                            labels=list(n.labels) if hasattr(n, "labels") else [],
-                            file_path=n.get("file_path"),
+                            name=n.get("name") or n.get("relative_path") or n.get("file_path") or "Unknown",
+                            qualified_name=n.get("qualified_name") or n.get("file_path"),
+                            labels=n_labels,
+                            file_path=n.get("file_path") or n.get("relative_path"),
                             start_line=n.get("start_line"),
                             end_line=n.get("end_line"),
                             docstring=n.get("docstring"),
@@ -86,10 +100,10 @@ class SubgraphBuilder:
                     path_node_objs.append(
                         GraphNode(
                             id=node_id,
-                            name=n.get("name", "Unknown"),
-                            qualified_name=n.get("qualified_name"),
-                            labels=list(n.labels) if hasattr(n, "labels") else [],
-                            file_path=n.get("file_path"),
+                            name=n.get("name") or n.get("relative_path") or n.get("file_path") or "Unknown",
+                            qualified_name=n.get("qualified_name") or n.get("file_path"),
+                            labels=n_labels,
+                            file_path=n.get("file_path") or n.get("relative_path"),
                             start_line=n.get("start_line"),
                             end_line=n.get("end_line"),
                             docstring=n.get("docstring"),
@@ -98,23 +112,33 @@ class SubgraphBuilder:
 
                 path_rel_types: list[str] = []
                 for rel in path_rels:
-                    rel_type = rel.type if hasattr(rel, "type") else "RELATED"
+                    if isinstance(rel, (tuple, list)) and len(rel) >= 2:
+                        rel_type = str(rel[1])
+                    elif hasattr(rel, "type"):
+                        rel_type = str(rel.type)
+                    elif isinstance(rel, dict) and "type" in rel:
+                        rel_type = str(rel["type"])
+                    else:
+                        rel_type = "RELATED"
                     path_rel_types.append(rel_type)
-                    start_node = rel.start_node if hasattr(rel, "start_node") else None
-                    end_node = rel.end_node if hasattr(rel, "end_node") else None
-                    if start_node and end_node and len(edges_list) < max_relationships:
-                        src_id = str(start_node.get("symbol_id") or start_node.get("name") or id(start_node))
-                        tgt_id = str(end_node.get("symbol_id") or end_node.get("name") or id(end_node))
-                        edge_key = (src_id, tgt_id, rel_type)
-                        if edge_key not in seen_edges:
-                            seen_edges.add(edge_key)
-                            edges_list.append(
-                                SubgraphEdge(
-                                    source_id=src_id,
-                                    target_id=tgt_id,
-                                    relationship_type=rel_type,
-                                )
+
+                # Connect edges along path nodes
+                for idx in range(len(path_node_objs) - 1):
+                    if len(edges_list) >= max_relationships:
+                        break
+                    src_n = path_node_objs[idx]
+                    tgt_n = path_node_objs[idx + 1]
+                    r_type = path_rel_types[idx] if idx < len(path_rel_types) else "RELATED"
+                    edge_key = (src_n.id, tgt_n.id, r_type)
+                    if edge_key not in seen_edges:
+                        seen_edges.add(edge_key)
+                        edges_list.append(
+                            SubgraphEdge(
+                                source_id=src_n.id,
+                                target_id=tgt_n.id,
+                                relationship_type=r_type,
                             )
+                        )
 
                 if path_node_objs and len(paths_list) < 20:
                     src_node = path_node_objs[0]

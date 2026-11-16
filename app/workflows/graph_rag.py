@@ -252,14 +252,58 @@ def subgraph_construction_node(state: GraphRAGState) -> dict[str, Any]:
     """Node 6: Extract focused multi-hop subgraph context and paths around seed entities."""
     builder = SubgraphBuilder()
     resolved = state.get("resolved_entities", [])
+    fused_results = state.get("fused_results", [])
+    semantic_results = state.get("semantic_results", [])
+    max_hops = state.get("max_hops", 2)
+
     subgraph = None
     paths: list[GraphPath] = []
 
-    if resolved:
-        seed = resolved[0].qualified_name
-        max_hops = state.get("max_hops", 2)
-        subgraph = builder.build_subgraph(symbol_identifier=seed, max_hops=max_hops)
-        paths = subgraph.paths
+    # Priority 1: Resolved entities from QueryAnalyzer / EntityResolver
+    candidate_seeds: list[str] = []
+    for ent in resolved:
+        if ent.qualified_name and ent.qualified_name not in candidate_seeds:
+            candidate_seeds.append(ent.qualified_name)
+        if ent.name and ent.name not in candidate_seeds:
+            candidate_seeds.append(ent.name)
+
+    # Priority 2: Fused RRF retrieval candidates
+    for res in fused_results:
+        if res.qualified_name and res.qualified_name not in candidate_seeds:
+            candidate_seeds.append(res.qualified_name)
+        if res.symbol_name and res.symbol_name not in candidate_seeds:
+            candidate_seeds.append(res.symbol_name)
+        if res.file_path and res.file_path not in candidate_seeds:
+            candidate_seeds.append(res.file_path)
+
+    # Priority 3: Semantic search matches
+    for res in semantic_results:
+        if res.qualified_name and res.qualified_name not in candidate_seeds:
+            candidate_seeds.append(res.qualified_name)
+        if res.symbol_name and res.symbol_name not in candidate_seeds:
+            candidate_seeds.append(res.symbol_name)
+        if res.file_path and res.file_path not in candidate_seeds:
+            candidate_seeds.append(res.file_path)
+
+    logger.info(
+        f"[LangGraph Node: subgraph_construction] Evaluating {len(candidate_seeds)} candidate seed(s) for graph traversal."
+    )
+
+    # Try seeds until we find paths
+    for seed in candidate_seeds[:5]:
+        candidate_subgraph = builder.build_subgraph(symbol_identifier=seed, max_hops=max_hops)
+        if candidate_subgraph.paths:
+            subgraph = candidate_subgraph
+            paths = candidate_subgraph.paths
+            logger.info(
+                f"[LangGraph Node: subgraph_construction] Discovered {len(paths)} graph paths seeded from '{seed}'."
+            )
+            break
+
+    if not paths and candidate_seeds:
+        logger.info(
+            "[LangGraph Node: subgraph_construction] No graph paths found in Neo4j after testing top candidate seeds."
+        )
 
     logger.info(f"[LangGraph Node: subgraph_construction] Built subgraph with {len(paths)} graph paths.")
     return {"subgraph": subgraph, "graph_paths": paths}
@@ -282,16 +326,21 @@ def context_fusion_node(state: GraphRAGState) -> dict[str, Any]:
 
 
 def answer_generation_node(state: GraphRAGState) -> dict[str, Any]:
-    """Node 8: Generate grounded answer using LLM adhering to evidence grounding constraints."""
+    """Node 8: Generate grounded, professional answer using LLM adhering to evidence grounding constraints."""
     llm = get_llm()
     system_prompt = (
-        "You are an expert Codebase Graph Intelligence AI assistant. "
-        "Strictly adhere to the following rules:\n"
-        "1. Reason ONLY from the supplied codebase evidence and context.\n"
-        "2. Do NOT invent code relationships or file paths.\n"
-        "3. Explicitly cite source file paths and line ranges in your response (e.g., `src/api/orders.py:20-45`).\n"
-        "4. Distinguish observed static relationships from inferred explanations.\n"
-        "5. If evidence is incomplete, explicitly acknowledge the uncertainty."
+        "You are an expert Software Architecture & Code Intelligence assistant.\n"
+        "CORE RESPONSE RULES:\n"
+        "1. Reason ONLY from the supplied codebase evidence and knowledge graph context.\n"
+        "2. Do NOT invent code relationships, file paths, or unsupported line numbers.\n"
+        "3. Provide a clear, structured response for professional developers:\n"
+        "   - ### Direct Answer: Immediate concise conclusion.\n"
+        "   - ### Explanation: Understandable technical explanation of the flow and component interactions.\n"
+        "   - ### Relevant Files & Symbols: Exact file paths and line ranges cited from context (format: `<file_path>:<start_line>-<end_line>`). Never fabricate placeholder files.\n"
+        "   - ### Why It Matters & Architectural Impact: Technical consequences and architectural context.\n"
+        "   - ### Developer Next Steps: Practical, actionable considerations.\n"
+        "4. Clearly distinguish verified facts from potential risks or uncertainties.\n"
+        "5. Avoid generic boilerplate conclusions or repetitive filler text."
     )
 
     prompt = f"""User Question:
@@ -300,29 +349,51 @@ def answer_generation_node(state: GraphRAGState) -> dict[str, Any]:
 Retrieved Codebase Evidence & Graph Context:
 {state.get("fused_context", "")}
 
-Provide a comprehensive, accurate, and grounded answer to the question using the context above."""
+Provide a comprehensive, accurate, well-structured, and grounded answer to the question using the context above."""
 
     try:
-        answer = llm.generate(prompt=prompt, system_prompt=system_prompt, temperature=0.2)
-    except Exception as e:  # noqa: BLE001 — LangGraph LLM generation node resilience boundary
-        logger.error(f"Error during LLM answer generation: {e}")
-        answer = f"Error generating grounded answer: {e}"
+        # Pass 4096 tokens to accommodate both reasoning tokens and visible structured text
+        answer = llm.generate(prompt=prompt, system_prompt=system_prompt, temperature=0.2, max_tokens=4096)
+        if not answer or not answer.strip():
+            logger.error(
+                f"[LangGraph Node: answer_generation] LLM provider '{llm.provider_name}' returned empty answer content."
+            )
+            return {"final_answer": None}
 
-    logger.info(f"[LangGraph Node: answer_generation] Answer generated via LLM provider '{llm.provider_name}'.")
-    return {"final_answer": answer}
+        logger.info(
+            f"[LangGraph Node: answer_generation] Answer generated successfully via LLM provider '{llm.provider_name}' "
+            f"({len(answer)} chars)."
+        )
+        return {"final_answer": answer}
+    except Exception as e:  # noqa: BLE001 — LangGraph LLM generation node resilience boundary
+        logger.error(f"[LangGraph Node: answer_generation] Error during LLM answer generation: {e}")
+        return {"final_answer": None}
 
 
 def validation_node(state: GraphRAGState) -> dict[str, Any]:
     """Node 9: Validate generated answer for ungrounded citations and claims."""
+    answer = state.get("final_answer")
+    if not answer or not answer.strip():
+        logger.warning(
+            "[LangGraph Node: validation] Groundedness validation skipped: No answer generated by LLM provider."
+        )
+        return {
+            "validation_status": False,
+            "validation_errors": ["No answer generated by LLM provider."],
+        }
+
     validator = AnswerValidator()
     is_valid, errors = validator.validate(
-        answer=state.get("final_answer") or "",
+        answer=answer,
         fused_results=state.get("fused_results", []),
         resolved_entities=state.get("resolved_entities", []),
         graph_results=state.get("graph_results", []),
         graph_paths=state.get("graph_paths", []),
         subgraph=state.get("subgraph"),
     )
+    if errors:
+        for err in errors:
+            logger.warning(f"[LangGraph Node: validation] Groundedness validation error: {err}")
     logger.info(f"[LangGraph Node: validation] Groundedness validation status: {is_valid} (errors: {len(errors)})")
     return {"validation_status": is_valid, "validation_errors": errors}
 
@@ -415,8 +486,26 @@ class GraphRAGPipeline:
                 "validation_errors": final_state.get("validation_errors", []),
             }
 
+        val_status = final_state.get("validation_status", True)
+        val_errors = final_state.get("validation_errors", [])
+        raw_final_answer = final_state.get("final_answer")
+        if not raw_final_answer or not raw_final_answer.strip():
+            final_answer = "No answer could be generated from the available codebase context."
+            val_status = False
+            if not val_errors:
+                val_errors = ["No answer generated by LLM provider."]
+            confidence = 0.0
+        else:
+            final_answer = raw_final_answer
+            confidence = 0.9 if val_status else 0.5
+
+        logger.info(
+            f"[GraphRAGPipeline] Query execution completed. status={val_status} "
+            f"answer_length={len(final_answer)} validation_errors={len(val_errors)}"
+        )
+
         return GraphRAGResponse(
-            answer=final_state.get("final_answer") or "No answer generated.",
+            answer=final_answer,
             repository_id=repository_id,
             query=question,
             intent=intent_str,
@@ -424,7 +513,8 @@ class GraphRAGPipeline:
             graph_paths=graph_paths,
             retrieved_chunks=[r.model_dump() for r in fused_res],
             retrieval_summary=f"Fused {len(fused_res)} items across graph and semantic search.",
-            confidence=0.9 if final_state.get("validation_status") else 0.5,
-            validation_status=final_state.get("validation_status", True),
+            confidence=confidence,
+            validation_status=val_status,
+            validation_errors=val_errors,
             debug_info=debug_data,
         )

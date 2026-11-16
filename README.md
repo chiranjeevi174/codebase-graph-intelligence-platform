@@ -18,7 +18,13 @@ These two representations complement each other:
 * **FastAPI** exposes the platform through APIs.
 * **Redis + ARQ** support asynchronous repository/PR processing workflows.
 
-The result is a system designed for **repository comprehension, dependency analysis, code impact analysis, API analysis, structural diff analysis, pull-request intelligence, and multi-hop code reasoning**.
+The result is a system providing exactly six primary software engineering intelligence capabilities:
+1. **Codebase Query (Graph RAG)**: Multi-hop natural-language code reasoning.
+2. **Impact Analysis**: Dependency explosion and blast-radius exploration.
+3. **API Flow Analysis**: Cross-language endpoint-to-client call tracing.
+4. **Pull Request Analysis**: Evidence-based automated PR review powered by internal structural diffing.
+5. **Architecture Intelligence & Visualization**: Interactive module graph, architectural layers, and grounded topology explanation.
+6. **Code Quality & Security Analysis**: AST code smell detection and credential/secret scanning with automated token redaction.
 
 ---
 
@@ -303,36 +309,15 @@ This helps connect externally visible APIs with the internal implementation stru
 
 ---
 
-# 8. Structural Diff Analysis
+# 8. Pull Request Analysis — Evidence-Based Review
 
-The platform includes structural code-diff capabilities beyond simple line-by-line comparison.
+The platform includes automated, evidence-based pull-request analysis workflows. Rather than presenting a generic diff, the PR review system investigates changed files, modified symbols, signature drifts, API changes, and potential downstream impacts.
 
-The diff subsystem contains analysis for areas such as:
-
-* API differences
-* symbol differences
-* signature differences
-* structural differences
-* relationship differences
-* Git diff processing
-
-This makes it possible to reason about how a code change affects the software structure rather than only reporting changed lines.
-
----
-
-# 9. Pull Request Intelligence
-
-The platform includes pull-request analysis workflows.
-
-The PR subsystem supports:
-
-* PR analysis
-* webhook-driven processing
-* PR comments
-* asynchronous processing
-* job tracking
-* analysis services
-* repository integration
+The PR subsystem is powered by an internal structural diff engine (`app/diff/`):
+* Symbol differences (added, removed, modified)
+* Signature drifts (parameters, return types)
+* API route differences
+* Structural and relationship diffs
 
 A conceptual workflow is:
 
@@ -340,27 +325,51 @@ A conceptual workflow is:
 Pull Request
       │
       ▼
-Webhook
+Webhook / API Trigger
       │
       ▼
-Async Job
+Async Job Queue (Redis + ARQ)
       │
       ▼
-Repository / Diff Analysis
+Internal Structural Diff Engine (app/diff/)
       │
       ▼
-Structural + Graph Analysis
+Graph & Blast Radius Impact Analysis
       │
       ▼
-LLM Reasoning
+Evidence-Based LLM Review Formulation
       │
       ▼
-PR Analysis / Feedback
+PR Sticky Comments & Job History
 ```
 
 ---
 
-# 10. GitHub and GitLab Integration
+# 9. Architecture Intelligence & Visualization
+
+The platform extracts and visualizes high-level codebase architecture directly from the Neo4j Knowledge Graph (with filesystem AST fallback).
+
+Key capabilities:
+* **Architecture Discovery**: Extracts modules, packages, files, classes, and cross-module connections.
+* **Architectural Layer Classification**: Automatically categorizes code into Presentation / API, Business Logic & Services, Persistence & Storage, and Infrastructure & Utilities.
+* **Entry Point Detection**: Highlights system entry points (e.g., `main.py`, server entry points, CLI handlers).
+* **Interactive Visualization**: Canvas powered by Cytoscape with node selection, pan, zoom, neighborhood highlighting, and right-panel inspection.
+* **Grounded Architecture Explanation**: Technical overview explaining module responsibilities and system topology without fabricating absent layers.
+
+---
+
+# 10. Code Quality & Security Analysis
+
+The platform features static code quality and security scanning:
+* **AST Code Quality Smells**: Identifies functions with high cyclomatic complexity (> 10), excessive length (> 50 lines), excessive parameters (> 6), mutable default arguments, wildcard imports, and silent bare exception suppression.
+* **Security Vulnerability Patterns**: Detects dynamic code execution (`eval`, `exec`), command injection (`shell=True`, `os.system`), SQL injection patterns, and unverified SSL connections.
+* **Credential & Secret Scanner**: Scans for OpenAI API keys, AWS access keys, GitHub personal access tokens, private keys, and hardcoded passwords.
+* **Automated Secret Redaction**: All detected tokens are cryptographically masked (e.g., `sk-proj-****[REDACTED]****a1b2`). Raw credentials are never exposed in reports or logs.
+* **Structured Findings**: Each finding includes severity, category, file location, masked code evidence, explanation, "Why It Matters", and recommended developer action.
+
+---
+
+# 11. GitHub and GitLab Integration
 
 The integration layer provides repository-provider abstractions for external source-control systems.
 
@@ -373,7 +382,7 @@ The architecture separates provider-specific functionality from the core analysi
 
 ---
 
-# 11. Asynchronous Job Processing
+# 12. Asynchronous Job Processing
 
 Repository and PR analysis can involve expensive operations such as:
 
@@ -410,7 +419,7 @@ The job system includes production-oriented concerns such as:
 
 ---
 
-# 12. Multi-Language Code Analysis
+# 13. Multi-Language Code Analysis
 
 The parsing layer is designed around language-specific parsers and shared parsing abstractions.
 
@@ -673,7 +682,9 @@ codebase-graph-intelligence-platform/
 │
 ├── app/
 │   ├── analysis/
-│   │   └── impact_service.py
+│   │   ├── architecture_service.py
+│   │   ├── impact_service.py
+│   │   └── quality_security_service.py
 │   │
 │   ├── api/
 │   │   ├── main.py
@@ -775,9 +786,20 @@ codebase-graph-intelligence-platform/
 │   └── utils/
 │
 ├── frontend/
+│   ├── favicon.svg
 │   ├── index.html
 │   ├── css/
+│   │   └── styles.css
 │   └── js/
+│       ├── api.js
+│       ├── architecture.js
+│       ├── graph.js
+│       ├── impact.js
+│       ├── pr.js
+│       ├── quality_security.js
+│       ├── query.js
+│       ├── state.js
+│       └── ui.js
 │
 ├── scripts/
 │   ├── analyze_api_flow.py
@@ -930,9 +952,9 @@ http://localhost:8000/redoc
 
 ---
 
-# Frontend
+# Frontend & Visual Identity
 
-The repository includes a browser-based frontend for interacting with the platform.
+The repository includes a modern, high-performance developer intelligence console styled in **Midnight Graphite & Electric Blue**.
 
 After starting the API, open:
 
@@ -940,7 +962,34 @@ After starting the API, open:
 http://localhost:8000/
 ```
 
-The frontend provides interfaces for interacting with functionality exposed by the backend, including repository analysis, querying, graph-related information, impact analysis, diff analysis, and PR workflows.
+### Visual Identity & Theme
+- **Color Palette**:
+  - Header: `#0C1422`
+  - Left Primary Navigation: `#131E30`
+  - Right Context Inspector: `#101A2A`
+  - Main Workspace Canvas: `#0A1120`
+  - Content Cards & Containers: `#162338`
+  - Elevated Cards & Modals: `#1D2C43`
+  - Accent / Brand Blue: `#4F8CFF` (Hover: `#3478F6`, Active: `#1D3B70`)
+- **Branding**:
+  - Custom geometric Code Graph Intelligence logo (`<svg>` with interconnected nodes and electric blue gradients).
+  - Dedicated browser favicon (`frontend/favicon.svg`).
+- **Graph Node Palette**:
+  - File: `#60A5FA`
+  - Class: `#C084FC`
+  - Function / Method: `#34D399`
+  - API Endpoint: `#FBBF24`
+  - API Client Call: `#F472B6`
+  - API Contract: `#22D3EE`
+
+### Primary Navigation Views
+The left navigation exposes exactly six primary features:
+1. **Codebase Query (Graph RAG)**: Natural-language query interface with structured markdown answers (Direct Answer, Explanation, Relevant Files & Symbols, Why It Matters, Recommended Action).
+2. **Impact Analysis**: Target symbol and file blast-radius analysis with depth controls and Cytoscape dependency subgraphs.
+3. **API Flow Analysis**: Endpoint-to-client route mapping across languages.
+4. **Pull Request Analysis**: Evidence-based review findings with risk assessment and asynchronous job history.
+5. **Architecture Intelligence & Visualization**: Interactive module graph, architectural layer decomposition cards (Presentation, Logic, Persistence, Infrastructure), and system entry point pills.
+6. **Code Quality & Security Analysis**: Severity breakdown cards (Critical, High, Medium, Low), category filter tabs, search filter, masked code snippets, and click-to-view source code modal.
 
 ---
 
@@ -1070,14 +1119,24 @@ Which internal functions implement this API endpoint?
 What dependencies are involved in this request flow?
 ```
 
-### Change analysis
+### Architecture analysis
 
 ```text
-What structural changes were introduced by this diff?
+What are the primary architectural layers and cross-module dependencies?
 ```
 
 ```text
-Which symbols or relationships changed?
+Where are the main entry points and high-level controllers located?
+```
+
+### Code quality and security analysis
+
+```text
+Are there any hardcoded secrets, tokens, or private keys in the repository?
+```
+
+```text
+Which functions exceed cyclomatic complexity thresholds or contain maintainability smells?
 ```
 
 ### Pull-request analysis
@@ -1358,30 +1417,24 @@ The architecture provides a foundation for further capabilities such as:
 
 # Project Status
 
-**Current release:** `v1.1.0-openai`
+**Current release:** `v2.0.0-architecture-quality`
 
 The project includes:
 
-* Graph RAG architecture
+* Graph RAG architecture (LangGraph + OpenAI)
 * Neo4j software knowledge graph
 * Qdrant semantic retrieval
 * Hybrid retrieval / RRF
-* LangGraph reasoning workflows
-* OpenAI LLM provider
-* Hugging Face embeddings
-* Multi-language parsing
-* Repository ingestion
-* Code impact analysis
-* API analysis
-* Structural diff analysis
-* Pull-request analysis
-* GitHub/GitLab integrations
-* Async job processing
-* Redis + ARQ worker architecture
-* Evaluation framework
-* Unit and integration testing
-* Browser frontend
-* Production-oriented configuration and documentation
+* Code impact analysis & blast radius exploration
+* API flow analysis (endpoint-to-client matching)
+* Evidence-based Pull Request analysis (powered by internal structural diff engine)
+* Architecture Intelligence & Visualization (layers, modules, entry points)
+* Code Quality & Security Analysis (AST smells, credential scanning with secret masking)
+* Multi-language parsing (Python, Go, Java, JavaScript, TypeScript)
+* GitHub & GitLab provider integrations
+* Async job processing with Redis + ARQ workers
+* Midnight Graphite & Electric Blue developer intelligence console
+* Evaluation framework and automated test suite
 
 ---
 

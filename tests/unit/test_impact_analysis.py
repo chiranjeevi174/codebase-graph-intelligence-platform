@@ -86,6 +86,8 @@ def test_impact_analysis_service_mock_resolution(monkeypatch):
     monkeypatch.setattr(service.entity_resolver, "resolve", mock_resolve)
     monkeypatch.setattr(service.graph_query_manager, "find_transitive_dependents", mock_find_dependents)
     monkeypatch.setattr(service.graph_query_manager, "find_transitive_dependencies", mock_find_dependencies)
+    monkeypatch.setattr(service.semantic_retriever, "retrieve", lambda *args, **kwargs: [])
+    monkeypatch.setattr(service, "_generate_llm_explanation", lambda *args, **kwargs: "Mocked explanation")
 
     req = ImpactAnalysisRequest(symbol="UserService", max_hops=2)
     res = service.analyze_impact(req)
