@@ -41,7 +41,11 @@ def resolve_repository_path(repository: str | None = None, repo_path: str | None
     # 1. If explicit non-current-dir repo_path provided and exists with .git
     if clean_repo_path and clean_repo_path not in (".", "./"):
         candidate = Path(clean_repo_path).resolve()
-        if candidate.exists() and candidate.is_dir() and ((candidate / ".git").exists() or _is_inside_git_dir(candidate)):
+        if (
+            candidate.exists()
+            and candidate.is_dir()
+            and ((candidate / ".git").exists() or _is_inside_git_dir(candidate))
+        ):
             return candidate
 
     # 2. Check data/repositories/
@@ -243,9 +247,7 @@ class GitDiffService:
                 return fetch_head_sha
 
         # Revision does not exist and could not be fetched
-        err_msg = (
-            f"Git revision '{clean_ref}' does not exist locally in '{self.repo_path}' and could not be fetched from remote."
-        )
+        err_msg = f"Git revision '{clean_ref}' does not exist locally in '{self.repo_path}' and could not be fetched from remote."
         logger.error(f"[GitDiffService] {err_msg}")
         raise GitRevisionNotFoundError(err_msg)
 

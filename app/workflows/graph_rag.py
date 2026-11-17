@@ -122,13 +122,48 @@ def graph_retrieval_node(state: GraphRAGState) -> dict[str, Any]:
     if intent in ("api_flow", "endpoint", "api_client", "api_contract", "cross_language"):
         # 1. Standard API flow infrastructure context: middleware, router wiring, handler, schemas, service, session, model
         flow_infra_files = [
-            (f"src/{repo_id}/main.py" if repo_id else "src/aegisops/main.py", 33, 97, "FastAPI Application Setup & Security Headers Middleware"),
-            (f"src/{repo_id}/api/router.py" if repo_id else "src/aegisops/api/router.py", 14, 25, "API Router Mounting (/api/v1)"),
-            (f"src/{repo_id}/api/incidents.py" if repo_id else "src/aegisops/api/incidents.py", 18, 48, "Route Handler & DbSession Dependency"),
-            (f"src/{repo_id}/api/schemas.py" if repo_id else "src/aegisops/api/schemas.py", 8, 25, "Pydantic Schemas (IncidentCreate, IncidentResponse)"),
-            (f"src/{repo_id}/services/incidents.py" if repo_id else "src/aegisops/services/incidents.py", 20, 36, "Service Layer Execution & PostgreSQL Commit"),
-            (f"src/{repo_id}/db/session.py" if repo_id else "src/aegisops/db/session.py", 18, 26, "PostgreSQL Session Dependency (get_db)"),
-            (f"src/{repo_id}/domain/incident.py" if repo_id else "src/aegisops/domain/incident.py", 17, 45, "PostgreSQL SQLAlchemy Incident Domain Model"),
+            (
+                f"src/{repo_id}/main.py" if repo_id else "src/aegisops/main.py",
+                33,
+                97,
+                "FastAPI Application Setup & Security Headers Middleware",
+            ),
+            (
+                f"src/{repo_id}/api/router.py" if repo_id else "src/aegisops/api/router.py",
+                14,
+                25,
+                "API Router Mounting (/api/v1)",
+            ),
+            (
+                f"src/{repo_id}/api/incidents.py" if repo_id else "src/aegisops/api/incidents.py",
+                18,
+                48,
+                "Route Handler & DbSession Dependency",
+            ),
+            (
+                f"src/{repo_id}/api/schemas.py" if repo_id else "src/aegisops/api/schemas.py",
+                8,
+                25,
+                "Pydantic Schemas (IncidentCreate, IncidentResponse)",
+            ),
+            (
+                f"src/{repo_id}/services/incidents.py" if repo_id else "src/aegisops/services/incidents.py",
+                20,
+                36,
+                "Service Layer Execution & PostgreSQL Commit",
+            ),
+            (
+                f"src/{repo_id}/db/session.py" if repo_id else "src/aegisops/db/session.py",
+                18,
+                26,
+                "PostgreSQL Session Dependency (get_db)",
+            ),
+            (
+                f"src/{repo_id}/domain/incident.py" if repo_id else "src/aegisops/domain/incident.py",
+                17,
+                45,
+                "PostgreSQL SQLAlchemy Incident Domain Model",
+            ),
         ]
         for fpath, s_l, e_l, label in flow_infra_files:
             ikey = f"infra_{fpath}:{s_l}"
@@ -200,9 +235,7 @@ def graph_retrieval_node(state: GraphRAGState) -> dict[str, Any]:
                 end_l = int(p_nodes[0].get("end_line") or start_l) if p_nodes else start_l
                 fpath = p_nodes[0].get("file_path") if p_nodes else "api_flow"
                 content_str = (
-                    f"API Flow Path: {path_str}\n"
-                    f"Relationships: {' -> '.join(p_rels)}\n"
-                    f"File: {fpath}:{start_l}-{end_l}"
+                    f"API Flow Path: {path_str}\nRelationships: {' -> '.join(p_rels)}\nFile: {fpath}:{start_l}-{end_l}"
                 )
                 key = f"api_flow_{path_str}"
                 if key not in seen:
@@ -228,7 +261,9 @@ def graph_retrieval_node(state: GraphRAGState) -> dict[str, Any]:
         records: list[dict[str, Any]] = []
 
         if intent in ("api_flow", "endpoint", "api_client", "api_contract", "cross_language"):
-            records.extend(qm.find_api_flow(entity.qualified_name, max_hops=state.get("max_hops", 3), repository_id=repo_id))
+            records.extend(
+                qm.find_api_flow(entity.qualified_name, max_hops=state.get("max_hops", 3), repository_id=repo_id)
+            )
             records.extend(qm.find_api_flow(entity.name, max_hops=state.get("max_hops", 3), repository_id=repo_id))
         if intent in ("callers", "general_code_question"):
             records.extend(qm.find_callers(entity.qualified_name))
@@ -401,6 +436,7 @@ def semantic_retrieval_node(state: GraphRAGState) -> dict[str, Any]:
 
     # For API flow or code trace queries, prioritize application source over tests/scripts
     if intent in ("api_flow", "endpoint", "execution_flow"):
+
         def _app_source_weight(r: NormalizedSearchResult) -> int:
             fp = r.file_path.replace("\\", "/")
             if fp.startswith(("tests/", "scripts/", "evaluation/")):
@@ -477,9 +513,7 @@ def subgraph_construction_node(state: GraphRAGState) -> dict[str, Any]:
     # Try seeds until we find paths
     repo_id = state.get("repository_id")
     for seed in candidate_seeds[:8]:
-        candidate_subgraph = builder.build_subgraph(
-            symbol_identifier=seed, max_hops=max_hops, repository_id=repo_id
-        )
+        candidate_subgraph = builder.build_subgraph(symbol_identifier=seed, max_hops=max_hops, repository_id=repo_id)
         if candidate_subgraph.paths:
             subgraph = candidate_subgraph
             paths = candidate_subgraph.paths

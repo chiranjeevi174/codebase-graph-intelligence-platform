@@ -142,7 +142,11 @@ class APIExtractor:
                     func_id = getattr(node.func, "id", getattr(node.func, "attr", None))
                     if func_id == "APIRouter":
                         for kw in node.keywords:
-                            if kw.arg == "prefix" and isinstance(kw.value, ast.Constant) and isinstance(kw.value.value, str):
+                            if (
+                                kw.arg == "prefix"
+                                and isinstance(kw.value, ast.Constant)
+                                and isinstance(kw.value.value, str)
+                            ):
                                 local_prefix = kw.value.value.strip()
 
             # Detect parent APIRouter prefix from sibling/parent router.py or main.py
@@ -233,7 +237,10 @@ class APIExtractor:
                                 # Extract request body schema from parameters
                                 req_schema = None
                                 for arg in node.args.args:
-                                    if arg.arg not in ("self", "cls", "db", "session", "request", "response") and arg.annotation:
+                                    if (
+                                        arg.arg not in ("self", "cls", "db", "session", "request", "response")
+                                        and arg.annotation
+                                    ):
                                         req_schema = ast.unparse(arg.annotation)
                                         break
 
@@ -272,9 +279,7 @@ class APIExtractor:
                             methods = ["GET"]
                             for kw in dec.keywords:
                                 if kw.arg == "methods" and isinstance(kw.value, (ast.List, ast.Tuple)):
-                                    methods = [
-                                        elt.value for elt in kw.value.elts if isinstance(elt, ast.Constant)
-                                    ]
+                                    methods = [elt.value for elt in kw.value.elts if isinstance(elt, ast.Constant)]
 
                             for m in methods:
                                 method = normalize_http_method(m)

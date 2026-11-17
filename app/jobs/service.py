@@ -39,7 +39,11 @@ class JobService:
 
         # Check existing job
         existing = self.repo.find_existing_job_by_key(idempotency_key)
-        if not getattr(request, "force", False) and existing and existing.status in (PRJobStatus.QUEUED, PRJobStatus.RUNNING):
+        if (
+            not getattr(request, "force", False)
+            and existing
+            and existing.status in (PRJobStatus.QUEUED, PRJobStatus.RUNNING)
+        ):
             is_stale = False
             ts_str = existing.started_at or existing.created_at
             if ts_str:

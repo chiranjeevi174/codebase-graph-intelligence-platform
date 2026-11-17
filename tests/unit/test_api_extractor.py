@@ -89,7 +89,7 @@ def test_api_extractor_fastapi_prefix_and_multiline(tmp_path):
     )
 
     incidents_file = repo_dir / "incidents.py"
-    code = '''
+    code = """
 from fastapi import APIRouter
 from pydantic import BaseModel
 
@@ -107,7 +107,7 @@ class IncidentResponse(BaseModel):
 )
 async def create_incident(data: IncidentCreate):
     return {"id": "1"}
-'''
+"""
     incidents_file.write_text(code, encoding="utf-8")
 
     sf = SourceFile(
@@ -125,4 +125,3 @@ async def create_incident(data: IncidentCreate):
     assert ep.request_schema == "IncidentCreate"
     assert ep.response_schema == "IncidentResponse"
     assert ep.controller_symbol.endswith("create_incident")
-

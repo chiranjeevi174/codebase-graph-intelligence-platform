@@ -22,11 +22,13 @@ class SymbolDiffEngine:
             fc = pair.file_change
             # Filter out top-level file/module container symbols so only code symbols are diffed
             base_symbols = [
-                s for s in (pair.base_data.symbols if pair.base_data else [])
+                s
+                for s in (pair.base_data.symbols if pair.base_data else [])
                 if getattr(s, "symbol_type", None) not in (SymbolType.MODULE, SymbolType.FILE, "Module", "File")
             ]
             target_symbols = [
-                s for s in (pair.target_data.symbols if pair.target_data else [])
+                s
+                for s in (pair.target_data.symbols if pair.target_data else [])
                 if getattr(s, "symbol_type", None) not in (SymbolType.MODULE, SymbolType.FILE, "Module", "File")
             ]
 

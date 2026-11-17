@@ -83,12 +83,49 @@ class QueryAnalyzer:
 
         # English instruction words and query keywords to exclude from candidate code symbols
         stop_symbols = {
-            "trace", "explain", "present", "highlight", "identify", "describe", "show",
-            "do", "not", "the", "this", "that", "http", "https", "api", "rest",
-            "postgresql", "postgres", "mysql", "database", "get", "post", "put", "delete", "patch",
-            "aegisops", "step", "flow", "actual", "source", "class", "classes",
-            "function", "functions", "relationship", "relationships", "evidence",
-            "middleware", "dependency", "dependencies", "background", "task", "tasks",
+            "trace",
+            "explain",
+            "present",
+            "highlight",
+            "identify",
+            "describe",
+            "show",
+            "do",
+            "not",
+            "the",
+            "this",
+            "that",
+            "http",
+            "https",
+            "api",
+            "rest",
+            "postgresql",
+            "postgres",
+            "mysql",
+            "database",
+            "get",
+            "post",
+            "put",
+            "delete",
+            "patch",
+            "aegisops",
+            "step",
+            "flow",
+            "actual",
+            "source",
+            "class",
+            "classes",
+            "function",
+            "functions",
+            "relationship",
+            "relationships",
+            "evidence",
+            "middleware",
+            "dependency",
+            "dependencies",
+            "background",
+            "task",
+            "tasks",
         }
 
         # Clean candidate symbols
@@ -104,12 +141,7 @@ class QueryAnalyzer:
 
         for s in raw_symbols:
             clean_s = s.strip("?,.()")
-            if (
-                clean_s
-                and len(clean_s) > 2
-                and clean_s.lower() not in stop_symbols
-                and clean_s not in cleaned_symbols
-            ):
+            if clean_s and len(clean_s) > 2 and clean_s.lower() not in stop_symbols and clean_s not in cleaned_symbols:
                 cleaned_symbols.append(clean_s)
 
         # Determine requested hops

@@ -103,8 +103,7 @@ class JobRepository:
             _MEMORY_RUNS[key] = []
         # In-memory deduplication and update
         _MEMORY_RUNS[key] = [
-            item for item in _MEMORY_RUNS[key]
-            if getattr(item, "analysis_run_id", None) != run.analysis_run_id
+            item for item in _MEMORY_RUNS[key] if getattr(item, "analysis_run_id", None) != run.analysis_run_id
         ]
         # Prepend latest run
         _MEMORY_RUNS[key].insert(0, run)

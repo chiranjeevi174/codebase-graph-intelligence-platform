@@ -129,7 +129,9 @@ class GitHubProvider(PRProvider):
                             action=data.get("state") or "synchronize",
                         )
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"[GitHubProvider] Live GitHub API lookup skipped/failed for {owner_repo} #{pr_number}: {e}")
+                logger.debug(
+                    f"[GitHubProvider] Live GitHub API lookup skipped/failed for {owner_repo} #{pr_number}: {e}"
+                )
 
         # Fallback structured container for offline / mock testing
         return PullRequestMetadata(
