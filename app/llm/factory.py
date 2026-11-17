@@ -4,6 +4,7 @@ from typing import ClassVar
 
 from app.config.settings import Settings, get_settings
 from app.llm.base import BaseLLMProvider
+from app.llm.mock_provider import MockLLMProvider
 from app.llm.openai_provider import OpenAIProvider
 from app.utils.exceptions import LLMProviderError
 from app.utils.logger import logger
@@ -14,6 +15,7 @@ class LLMFactory:
 
     _providers: ClassVar[dict[str, type[BaseLLMProvider]]] = {
         "openai": OpenAIProvider,
+        "mock": MockLLMProvider,
     }
 
     @classmethod

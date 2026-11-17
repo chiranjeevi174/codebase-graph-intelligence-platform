@@ -33,7 +33,7 @@ from app.models.entities import SymbolType
 def _init_git_repo(path: Path) -> tuple[str, str]:
     """Initialize an isolated git repo with a base commit and a branch with pr_analysis_test.py."""
     path.mkdir(parents=True, exist_ok=True)
-    subprocess.run(["git", "init"], cwd=str(path), check=True, capture_output=True)
+    subprocess.run(["git", "init", "-b", "main"], cwd=str(path), check=True, capture_output=True)
     subprocess.run(["git", "config", "user.name", "TestUser"], cwd=str(path), check=True, capture_output=True)
     subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=str(path), check=True, capture_output=True)
 
@@ -42,6 +42,7 @@ def _init_git_repo(path: Path) -> tuple[str, str]:
     readme.write_text("# Test Repo\n", encoding="utf-8")
     subprocess.run(["git", "add", "README.md"], cwd=str(path), check=True, capture_output=True)
     subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=str(path), check=True, capture_output=True)
+    subprocess.run(["git", "branch", "-M", "main"], cwd=str(path), check=True, capture_output=True)
     base_sha = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=str(path), check=True, capture_output=True, text=True
     ).stdout.strip()
@@ -59,6 +60,7 @@ def _init_git_repo(path: Path) -> tuple[str, str]:
     test_file.write_text(code, encoding="utf-8")
     subprocess.run(["git", "add", "pr_analysis_test.py"], cwd=str(path), check=True, capture_output=True)
     subprocess.run(["git", "commit", "-m", "Add pr analysis test file"], cwd=str(path), check=True, capture_output=True)
+    subprocess.run(["git", "branch", "feature"], cwd=str(path), check=False, capture_output=True)
     head_sha = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=str(path), check=True, capture_output=True, text=True
     ).stdout.strip()
@@ -147,27 +149,32 @@ def test_genuinely_empty_pr_produces_zero_changes(tmp_path):
     assert symbol_changes == []
 
 
-def test_github_pr_analysis_uses_correct_repository_and_revisions():
+def test_github_pr_analysis_uses_correct_repository_and_revisions(tmp_path, monkeypatch):
     """6: Verify repository resolution logic correctly maps repository names and fixtures."""
     # Tests fixtures directory resolution
     sample_path = resolve_repository_path(repository="sample_repo", repo_path="tests/fixtures/sample_repo")
     assert sample_path.exists()
     assert "sample_repo" in str(sample_path)
 
+    # Deterministic ingested repository in data/repositories/aegisops
+    fake_data_dir = tmp_path / "data" / "repositories" / "aegisops"
+    fake_data_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.chdir(tmp_path)
+
     # Broken fixture path falls back to data/repositories/aegisops if AegisOps is requested
     aegis_path = resolve_repository_path(repository="AegisOps", repo_path="tests/fixtures/AegisOps")
     assert aegis_path.exists()
-    assert "aegisops" in str(aegis_path).lower()
+    assert aegis_path.resolve() == fake_data_dir.resolve()
 
     # Short name AegisOps without repo_path resolves to data/repositories/aegisops
     aegis_auto = resolve_repository_path(repository="AegisOps", repo_path=None)
     assert aegis_auto.exists()
-    assert "aegisops" in str(aegis_auto).lower()
+    assert aegis_auto.resolve() == fake_data_dir.resolve()
 
     # Full slug chiranjeevi174/AegisOps resolves to data/repositories/aegisops
     aegis_slug = resolve_repository_path(repository="chiranjeevi174/AegisOps", repo_path=".")
     assert aegis_slug.exists()
-    assert "aegisops" in str(aegis_slug).lower()
+    assert aegis_slug.resolve() == fake_data_dir.resolve()
 
 
 def test_history_deduplication_prevents_duplicate_run_ids():

@@ -1,9 +1,11 @@
 """Integration test for end-to-end Graph RAG reasoning questions on sample_repo."""
 
+import os
 from pathlib import Path
 
 import pytest
 
+from app.config.settings import get_settings
 from app.embeddings.qdrant_store import QdrantStore
 from app.graph.neo4j_client import Neo4jClient
 from app.ingestion.repository_service import RepositoryIngestionService
@@ -12,8 +14,12 @@ from app.workflows.graph_rag import GraphRAGPipeline
 
 
 @pytest.mark.integration
-def test_graph_rag_end_to_end_questions():
+def test_graph_rag_end_to_end_questions(monkeypatch):
     """Ingest sample_repo and run 5 required end-to-end questions verifying real graph/vector grounding."""
+    # Automated tests should be deterministic and not require an external paid LLM API
+    if os.getenv("RUN_LIVE_OPENAI_TESTS") != "1":
+        monkeypatch.setenv("LLM_PROVIDER", "mock")
+        get_settings.cache_clear()
     sample_path = str(Path("tests/fixtures/sample_repo").resolve())
 
     neo4j_client = Neo4jClient()

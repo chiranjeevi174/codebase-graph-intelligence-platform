@@ -57,7 +57,7 @@ class Settings(BaseSettings):
     EMBEDDING_MODEL: str = "BAAI/bge-small-en-v1.5"
 
     # LLM Provider selection
-    LLM_PROVIDER: Literal["openai"] = "openai"
+    LLM_PROVIDER: Literal["openai", "mock"] = "openai"
 
     # OpenAI Provider settings
     OPENAI_API_KEY: str = ""

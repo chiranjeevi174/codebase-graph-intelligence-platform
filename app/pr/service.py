@@ -67,15 +67,23 @@ class PRAnalysisService:
                     pr_meta = provider_inst.get_pull_request(repo, pr_num)
                     if pr_meta:
                         if not base_present:
-                            if pr_meta.base_sha and pr_meta.base_sha != "HEAD~1":
+                            if (
+                                pr_meta.base_sha
+                                and pr_meta.base_sha != "HEAD~1"
+                                and git_svc_pre.has_commit(pr_meta.base_sha)
+                            ):
                                 base_ref = pr_meta.base_sha
-                            elif pr_meta.target_branch:
+                            elif pr_meta.target_branch and git_svc_pre.has_commit(pr_meta.target_branch):
                                 base_ref = pr_meta.target_branch
 
                         if not target_present:
-                            if pr_meta.head_sha and pr_meta.head_sha != "HEAD":
+                            if (
+                                pr_meta.head_sha
+                                and pr_meta.head_sha != "HEAD"
+                                and git_svc_pre.has_commit(pr_meta.head_sha)
+                            ):
                                 target_ref = pr_meta.head_sha
-                            elif pr_meta.source_branch:
+                            elif pr_meta.source_branch and git_svc_pre.has_commit(pr_meta.source_branch):
                                 target_ref = pr_meta.source_branch
             except Exception as ex:  # noqa: BLE001
                 logger.debug(f"[PRAnalysisService] Remote PR metadata check skipped: {ex}")

@@ -46,10 +46,15 @@ def test_llm_factory_openai_provider():
 
 
 def test_llm_factory_custom_registration():
-    LLMFactory.register_provider("mock", MockLLMProvider)
-    provider = LLMFactory.get_llm(provider="mock")
-    assert provider.provider_name == "mock"
-    assert provider.generate("What is AST?") == "Mock answer to: What is AST?"
+    orig_mock = LLMFactory._providers.get("mock")
+    try:
+        LLMFactory.register_provider("mock", MockLLMProvider)
+        provider = LLMFactory.get_llm(provider="mock")
+        assert provider.provider_name == "mock"
+        assert provider.generate("What is AST?") == "Mock answer to: What is AST?"
+    finally:
+        if orig_mock:
+            LLMFactory.register_provider("mock", orig_mock)
 
 
 def test_llm_provider_missing_key_error():
