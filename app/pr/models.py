@@ -13,13 +13,14 @@ class PRAnalysisRequest(BaseModel):
     provider: str = Field(default="github", description="PR Provider e.g. github, gitlab")
     repository: str = Field(..., description="Repository name or slug e.g. owner/repo")
     pr_number: int = Field(default=1, description="Pull Request or Merge Request number")
-    repo_path: str = Field(default=".", description="Path to local repository directory")
+    repo_path: str | None = Field(default=None, description="Path to local repository directory")
     base_ref: str = Field(default="HEAD~1", description="Base Git ref")
     target_ref: str = Field(default="HEAD", description="Target Git ref")
     dry_run: bool = Field(default=True, description="If True, generate report without posting platform comment")
     max_hops: int = Field(default=3, description="Maximum graph traversal depth")
     max_nodes: int = Field(default=50, description="Maximum impact nodes to evaluate")
     max_relationships: int = Field(default=100, description="Maximum relationships to evaluate")
+    force: bool = Field(default=False, description="If True, force fresh analysis execution")
 
 
 class PRAnalysisSummary(BaseModel):

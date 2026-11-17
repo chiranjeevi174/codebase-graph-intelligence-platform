@@ -340,6 +340,9 @@ class GraphRAGResponse(BaseModel):
     retrieval_summary: str | None = None
     confidence: float = 0.8
     validation_status: bool = True
+    validation_errors: list[str] = Field(
+        default_factory=list, description="Validation issues identified if answer is not fully grounded"
+    )
     debug_info: dict[str, Any] | None = None
 
 
@@ -389,6 +392,9 @@ class ImpactAnalysisRequest(BaseModel):
     max_hops: int | str = Field(2, description="Maximum traversal depth (1, 2, 3, or 'all')")
     max_nodes: int = Field(50, description="Maximum total nodes to evaluate")
     max_relationships: int = Field(100, description="Maximum relationships to traverse")
+    include_explanation: bool = Field(
+        default=True, description="Whether to invoke LLM to generate an impact explanation"
+    )
 
 
 class ImpactAnalysisResult(BaseModel):
@@ -405,3 +411,148 @@ class ImpactAnalysisResult(BaseModel):
     evidence_snippets: list[NormalizedSearchResult] = Field(default_factory=list)
     explanation: str
     analysis_truncated: bool = False
+
+
+# ============================================================================
+# Architecture Intelligence & Visualization Data Models
+# ============================================================================
+
+
+class ArchitectureNode(BaseModel):
+    """Component node in architectural discovery and visualization."""
+
+    id: str
+    name: str
+    label: str  # "Module", "Package", "File", "Class", "Function", "ApiEndpoint"
+    path: str
+    layer: str = "Service"  # Presentation/API, Business Logic/Service, Data/Persistence, Infrastructure/Utility
+    file_count: int = 0
+    symbol_count: int = 0
+    incoming_dependencies: int = 0
+    outgoing_dependencies: int = 0
+    description: str = ""
+    is_entry_point: bool = False
+
+
+class ArchitectureEdge(BaseModel):
+    """Dependency or interaction edge between architectural components."""
+
+    id: str
+    source: str
+    target: str
+    type: str  # DEPENDS_ON, CALLS, IMPORTS, ROUTES_TO
+    weight: int = 1
+    description: str = ""
+
+
+class ArchitectureLayer(BaseModel):
+    """Logical architectural layer organizing code components."""
+
+    name: str
+    description: str
+    components: list[str] = Field(default_factory=list)
+
+
+class ArchitectureSummary(BaseModel):
+    """High-level metrics and discovery summary for repository architecture."""
+
+    repository_id: str
+    total_modules: int = 0
+    total_packages: int = 0
+    total_files: int = 0
+    total_classes: int = 0
+    total_functions: int = 0
+    total_endpoints: int = 0
+    entry_points: list[str] = Field(default_factory=list)
+    layers_detected: list[str] = Field(default_factory=list)
+
+
+class ArchitectureAnalysisRequest(BaseModel):
+    """Parameters for running Architecture Intelligence & Discovery."""
+
+    repository_id: str = Field("sample_repo", description="Target repository ID")
+    repo_path: str | None = Field(None, description="Optional filesystem path to repository")
+    level: str = Field("overview", description="Granularity level: 'overview' or 'detailed'")
+
+
+class ArchitectureAnalysisResult(BaseModel):
+    """Complete structured response for Architecture Intelligence."""
+
+    repository_id: str
+    summary: ArchitectureSummary
+    layers: list[ArchitectureLayer] = Field(default_factory=list)
+    nodes: list[ArchitectureNode] = Field(default_factory=list)
+    edges: list[ArchitectureEdge] = Field(default_factory=list)
+    entry_points: list[dict[str, Any]] = Field(default_factory=list)
+    explanation: str
+
+
+# ============================================================================
+# Code Quality & Security Analysis Data Models
+# ============================================================================
+
+
+class FindingCategory(str, Enum):
+    QUALITY = "quality"
+    SECURITY = "security"
+
+
+class SeverityLevel(str, Enum):
+    CRITICAL = "Critical"
+    HIGH = "High"
+    MEDIUM = "Medium"
+    LOW = "Low"
+    INFORMATIONAL = "Informational"
+
+
+class AnalysisFinding(BaseModel):
+    """Evidence-backed code quality or security analysis finding."""
+
+    id: str
+    title: str
+    category: FindingCategory
+    severity: SeverityLevel
+    file_path: str
+    line_number: int | None = None
+    end_line: int | None = None
+    code_evidence: str = ""
+    explanation: str
+    why_it_matters: str
+    suggested_remediation: str
+    rule_id: str
+    confidence: str = "High"  # High, Medium, Low
+
+
+class QualitySecuritySummary(BaseModel):
+    """Aggregated repository-level counts and severity distribution."""
+
+    total_findings: int = 0
+    quality_count: int = 0
+    security_count: int = 0
+    critical_count: int = 0
+    high_count: int = 0
+    medium_count: int = 0
+    low_count: int = 0
+    info_count: int = 0
+    files_scanned: int = 0
+
+
+class QualitySecurityAnalysisRequest(BaseModel):
+    """Parameters for running Code Quality & Security Analysis."""
+
+    repository_id: str = Field("sample_repo", description="Target repository ID")
+    repo_path: str | None = Field(None, description="Optional local directory path to target repository")
+    categories: list[str] = Field(
+        default_factory=lambda: ["quality", "security"],
+        description="Categories to analyze: 'quality', 'security', or both",
+    )
+    min_severity: str | None = Field(None, description="Optional minimum severity threshold")
+
+
+class QualitySecurityAnalysisResult(BaseModel):
+    """Complete structured response for Code Quality & Security Analysis."""
+
+    repository_id: str
+    summary: QualitySecuritySummary
+    findings: list[AnalysisFinding] = Field(default_factory=list)
+    explanation: str

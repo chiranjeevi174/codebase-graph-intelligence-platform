@@ -59,18 +59,74 @@ class QueryAnalyzer:
         else:
             intent = "general_code_question"
 
+        # Repository identification from query context if not explicitly provided
+        detected_repo = repository_id
+        if not detected_repo:
+            repo_match = re.search(r"\bin\s+([a-zA-Z0-9_\-]+)\b", query, re.IGNORECASE)
+            if repo_match:
+                detected_repo = repo_match.group(1).lower()
+            elif "aegisops" in q_lower:
+                detected_repo = "aegisops"
+
         # Candidate symbol & file extraction heuristics
         # 1. Look for CamelCase or snake_case terms or terms with parentheses/dots
         symbol_pattern = r"\b[A-Z][a-zA-Z0-9_]+(?:\.[a-zA-Z0-9_]+)*\b|\b[a-z_][a-z0-9_]*(?:\.[a-z0-9_]+)+\b|\b[a-z0-9_]+_[a-z0-9_]+\b"
         raw_symbols = re.findall(symbol_pattern, query)
 
         # 2. Extract API URL paths e.g. /api/users, GET /api/users, /users
-        api_path_pattern = r"(?:GET|POST|PUT|DELETE|PATCH)?\s*(/[a-zA-Z0-9_\-/{}\:]+)"
+        api_path_pattern = r"((?:(?:GET|POST|PUT|DELETE|PATCH)\s+)?/[a-zA-Z0-9_\-/{}\:]+)"
         api_paths = re.findall(api_path_pattern, query, re.IGNORECASE)
 
         # 3. Look for file extensions (.py, .js, etc.)
         file_pattern = r"\b[a-zA-Z0-9_\-/]+\.(?:py|js|ts|java|go|yaml|yml|json|md)\b"
         candidate_files = re.findall(file_pattern, query)
+
+        # English instruction words and query keywords to exclude from candidate code symbols
+        stop_symbols = {
+            "trace",
+            "explain",
+            "present",
+            "highlight",
+            "identify",
+            "describe",
+            "show",
+            "do",
+            "not",
+            "the",
+            "this",
+            "that",
+            "http",
+            "https",
+            "api",
+            "rest",
+            "postgresql",
+            "postgres",
+            "mysql",
+            "database",
+            "get",
+            "post",
+            "put",
+            "delete",
+            "patch",
+            "aegisops",
+            "step",
+            "flow",
+            "actual",
+            "source",
+            "class",
+            "classes",
+            "function",
+            "functions",
+            "relationship",
+            "relationships",
+            "evidence",
+            "middleware",
+            "dependency",
+            "dependencies",
+            "background",
+            "task",
+            "tasks",
+        }
 
         # Clean candidate symbols
         cleaned_symbols = []
@@ -78,10 +134,14 @@ class QueryAnalyzer:
             p_clean = p.strip()
             if p_clean and p_clean not in cleaned_symbols:
                 cleaned_symbols.append(p_clean)
+                # If it had a method prefix, also include bare path
+                parts = p_clean.split()
+                if len(parts) == 2 and parts[1] not in cleaned_symbols:
+                    cleaned_symbols.append(parts[1])
 
         for s in raw_symbols:
             clean_s = s.strip("?,.()")
-            if clean_s and len(clean_s) > 2 and clean_s not in cleaned_symbols:
+            if clean_s and len(clean_s) > 2 and clean_s.lower() not in stop_symbols and clean_s not in cleaned_symbols:
                 cleaned_symbols.append(clean_s)
 
         # Determine requested hops
@@ -97,7 +157,7 @@ class QueryAnalyzer:
             candidate_symbols=cleaned_symbols,
             candidate_files=candidate_files,
             requested_hops=requested_hops,
-            repository_id=repository_id,
+            repository_id=detected_repo,
         )
 
         logger.info(f"[QueryAnalyzer] Intent: '{intent}', Candidates: {cleaned_symbols}, Files: {candidate_files}")

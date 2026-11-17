@@ -3,7 +3,8 @@
 from app.diff.diff_models import ChangeType, SymbolChange
 from app.diff.signature_diff import compare_signatures
 from app.diff.structural_diff import FileSnapshotPair
-from app.models.entities import CodeSymbol
+from app.models.entities import CodeSymbol, SymbolType
+from app.utils.logger import logger
 
 
 class SymbolDiffEngine:
@@ -19,8 +20,17 @@ class SymbolDiffEngine:
 
         for pair in snapshot_pairs:
             fc = pair.file_change
-            base_symbols = pair.base_data.symbols if pair.base_data else []
-            target_symbols = pair.target_data.symbols if pair.target_data else []
+            # Filter out top-level file/module container symbols so only code symbols are diffed
+            base_symbols = [
+                s
+                for s in (pair.base_data.symbols if pair.base_data else [])
+                if getattr(s, "symbol_type", None) not in (SymbolType.MODULE, SymbolType.FILE, "Module", "File")
+            ]
+            target_symbols = [
+                s
+                for s in (pair.target_data.symbols if pair.target_data else [])
+                if getattr(s, "symbol_type", None) not in (SymbolType.MODULE, SymbolType.FILE, "Module", "File")
+            ]
 
             # Map by qualified_name / symbol_name
             base_map: dict[str, CodeSymbol] = {s.qualified_name: s for s in base_symbols}
@@ -130,4 +140,7 @@ class SymbolDiffEngine:
                         )
                     )
 
+        logger.info(
+            f"[SymbolDiffEngine] Computed {len(symbol_changes)} changed symbols across {len(snapshot_pairs)} file snapshots."
+        )
         return symbol_changes

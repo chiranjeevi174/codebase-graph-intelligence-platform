@@ -65,9 +65,16 @@ class ContextFusion:
                 prov = f"[Source: {res.source.upper()} | RRF Score: {res.rrf_score:.4f}]"
                 citation = f"File: {res.file_path}:{res.start_line}-{res.end_line}"
 
-                snippet = (
-                    f"--- Snippet #{idx} ({prov}) ---\n{sym_header}\n{citation}\n\n```\n{res.content.strip()}\n```"
-                )
+                raw_content = res.content.strip() if res.content else ""
+                # Cap oversized individual chunks at 3,000 chars to protect context window while retaining citations
+                if len(raw_content) > 3000:
+                    truncated_len = len(raw_content) - 2800
+                    raw_content = (
+                        f"{raw_content[:2800]}\n\n"
+                        f"... [remaining {truncated_len} characters truncated for context brevity]"
+                    )
+
+                snippet = f"--- Snippet #{idx} ({prov}) ---\n{sym_header}\n{citation}\n\n```\n{raw_content}\n```"
                 code_lines.append(snippet)
             sections.append("\n".join(code_lines))
 

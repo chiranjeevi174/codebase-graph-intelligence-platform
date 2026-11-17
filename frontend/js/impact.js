@@ -95,8 +95,8 @@ export async function handleImpactSubmit() {
             <span class="tag ${indicatorTag}">${indicatorText}</span>
           </div>
 
-          <div style="font-size:13px; color:var(--text-secondary); line-height:1.5;">
-            ${escapeHtml(response.explanation || 'Code impact analysis and dependency propagation graph compiled.')}
+          <div style="font-size:13px; color:var(--text-secondary); line-height:1.55;">
+            ${renderMarkdown(response.explanation || 'Code impact analysis and dependency propagation graph compiled.')}
           </div>
 
           <table class="kv-table">
@@ -273,6 +273,17 @@ export async function handleApiFlowSubmit() {
       apiFlowBtn.innerHTML = `Trace API Flow`;
     }
   }
+}
+
+function renderMarkdown(text) {
+  if (!text) return "";
+  let out = escapeHtml(text);
+  out = out.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+  out = out.replace(/^### (.*?)$/gm, "<h3 style='color:var(--text-primary); font-size:13px; margin:10px 0 4px;'>$1</h3>");
+  out = out.replace(/`([^`]+)`/g, "<code>$1</code>");
+  out = out.replace(/^- (.*?)$/gm, "<li style='margin-left:18px;'>$1</li>");
+  out = out.replace(/\n\n/g, "<br><br>");
+  return out;
 }
 
 function escapeHtml(text) {

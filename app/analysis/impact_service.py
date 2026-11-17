@@ -210,23 +210,37 @@ class CodeImpactAnalysisService:
             analysis_truncated=truncated,
         )
 
-        # 6. Retrieve Supplementary Qdrant Vector Context for target and impacted entities
-        evidence_snippets: list[NormalizedSearchResult] = self.semantic_retriever.retrieve(
-            query=target_qn,
-            limit=5,
-            repository_id=request.repository_id,
-        )
+        # 6. Retrieve Supplementary Qdrant Vector Context & Grounded LLM Explanation
+        evidence_snippets: list[NormalizedSearchResult] = []
+        should_explain = getattr(request, "include_explanation", True)
 
-        # 7. Grounded LLM Explanation
-        explanation = self._generate_llm_explanation(
-            target=target_entity,
-            summary=summary,
-            direct_dependents=direct_dependents,
-            transitive_dependents=transitive_dependents,
-            direct_dependencies=direct_dependencies,
-            impact_paths=impact_paths,
-            evidence=evidence_snippets,
-        )
+        if should_explain:
+            try:
+                evidence_snippets = self.semantic_retriever.retrieve(
+                    query=target_qn,
+                    limit=5,
+                    repository_id=request.repository_id,
+                )
+            except Exception as e:  # noqa: BLE001 # Supplementary semantic retrieval graceful fallback
+                logger.warning(f"[ImpactAnalysisService] Supplementary semantic retrieval failed: {e}")
+                evidence_snippets = []
+
+            # 7. Grounded LLM Explanation
+            explanation = self._generate_llm_explanation(
+                target=target_entity,
+                summary=summary,
+                direct_dependents=direct_dependents,
+                transitive_dependents=transitive_dependents,
+                direct_dependencies=direct_dependencies,
+                impact_paths=impact_paths,
+                evidence=evidence_snippets,
+            )
+        else:
+            explanation = (
+                f"Static graph impact analysis completed for '{target_qn}'. "
+                f"Impacted files: {len(affected_files_set)}, direct dependents: {len(direct_dependents)}, "
+                f"transitive dependents: {len(transitive_dependents)}."
+            )
 
         return ImpactAnalysisResult(
             target=target_entity,
@@ -256,14 +270,18 @@ class CodeImpactAnalysisService:
         llm = get_llm()
 
         system_prompt = (
-            "You are an expert AI software architect performing Code Impact Analysis.\n"
+            "You are a Senior Software Architect performing static Code Impact Analysis.\n"
             "STRICT GUIDELINES:\n"
             "1. Report ONLY observed static code relationships (CALLS, DEPENDS_ON, IMPORTS, INHERITS).\n"
-            "2. Never claim a downstream component will definitely fail or break at runtime. Use precise phrasing: "
-            "'Static analysis identifies these downstream dependencies that may require review...'\n"
+            "2. Never claim a downstream component will definitely break at runtime without evidence. Use precise phrasing:\n"
+            "   'Static analysis identifies these downstream components that may require review...'\n"
             "3. Cite exact file paths and line ranges for all mentioned entities.\n"
-            "4. Clearly distinguish direct impact (1-hop) from transitive impact (>1 hop).\n"
-            "5. State any uncertainty if static analysis cannot fully determine runtime behavior."
+            "4. Structure the response clearly:\n"
+            "   - Potential Impact: Summary of the component and direct/transitive blast radius.\n"
+            "   - Why It Matters: Technical significance of these dependencies and potential regression risks.\n"
+            "   - Supporting Evidence: Key dependency paths and affected files.\n"
+            "   - Recommended Developer Actions: Specific functions to review or tests to run before modifying this symbol.\n"
+            "5. Avoid generic conclusions. Provide actionable, grounded engineering insights."
         )
 
         deps_summary = (
@@ -327,9 +345,15 @@ Explain the structural impact of modifying `{target.name}` grounded in these sta
             explanation = llm.generate(prompt=prompt, system_prompt=system_prompt, temperature=0.2)
         except Exception as e:  # noqa: BLE001 # LLM explanation generation fallback
             logger.error(f"Error generating impact explanation via LLM: {e}")
+            first_caller = direct_dependents[0].name if direct_dependents else "upstream callers"
             explanation = (
-                f"Static analysis identifies {summary.direct_dependents_count} direct dependents and "
-                f"{summary.transitive_dependents_count} transitive dependents across {summary.affected_files_count} files."
+                f"**Potential Impact:** The `{target.name}` ({target.symbol_type}) component is referenced across "
+                f"**{summary.affected_files_count} files**, with **{summary.direct_dependents_count} direct dependents** "
+                f"and **{summary.transitive_dependents_count} transitive dependents**.\n\n"
+                f"**Why It Matters:** Modifications to `{target.name}` alter the expected structural interface for "
+                f"calling components such as `{first_caller}`. Downstream callers may fail if signatures, return types, or parameter expectations change.\n\n"
+                f"**Recommended Developer Action:** Review dependent call sites in `{target.file_path}` and dependent modules before merging. "
+                f"Execute targeted unit tests covering `{first_caller}` to verify contract compatibility."
             )
 
         return explanation

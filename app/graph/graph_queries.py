@@ -11,35 +11,37 @@ class GraphQueryManager:
     def __init__(self, client: Neo4jClient | None = None):
         self.client = client or Neo4jClient()
 
-    def find_symbol(self, identifier: str) -> list[dict[str, Any]]:
+    def find_symbol(self, identifier: str, repository_id: str | None = None) -> list[dict[str, Any]]:
         """Find nodes matching a symbol name, qualified name, or API endpoint/URL path."""
         query = """
         MATCH (s)
-        WHERE s.name = $id OR s.qualified_name = $id OR s.symbol_id = $id
-           OR (s:ApiEndpoint AND (s.endpoint_id = $id OR s.path = $id))
+        WHERE (s.name = $id OR s.qualified_name = $id OR s.symbol_id = $id
+           OR (s:ApiEndpoint AND (s.endpoint_id = $id OR s.path = $id OR s.path ENDS WITH $id OR s.name = $id OR s.name CONTAINS $id))
            OR (s:ApiClientCall AND (s.call_id = $id OR s.url = $id))
-           OR (s:ApiContract AND (s.contract_id = $id OR s.path_template = $id))
+           OR (s:ApiContract AND (s.contract_id = $id OR s.path_template = $id)))
+          AND ($repo_id IS NULL OR s.repository_id = $repo_id OR s.file_path CONTAINS $repo_id)
         RETURN labels(s) AS labels, coalesce(s.symbol_id, s.endpoint_id, s.call_id, s.contract_id) AS symbol_id,
                s.name AS name, s.qualified_name AS qualified_name,
                s.file_path AS file_path, s.start_line AS start_line, s.end_line AS end_line,
                s.docstring AS docstring
         """
-        return self.client.execute_read(query, {"id": identifier})
+        return self.client.execute_read(query, {"id": identifier, "repo_id": repository_id})
 
-    def find_symbols(self, identifiers: list[str]) -> list[dict[str, Any]]:
+    def find_symbols(self, identifiers: list[str], repository_id: str | None = None) -> list[dict[str, Any]]:
         """Find nodes matching any identifier in a list of symbol names/qualified names/API paths."""
         query = """
         MATCH (s)
-        WHERE s.name IN $ids OR s.qualified_name IN $ids OR s.symbol_id IN $ids
+        WHERE (s.name IN $ids OR s.qualified_name IN $ids OR s.symbol_id IN $ids
            OR (s:ApiEndpoint AND (s.endpoint_id IN $ids OR s.path IN $ids))
            OR (s:ApiClientCall AND (s.call_id IN $ids OR s.url IN $ids))
-           OR (s:ApiContract AND (s.contract_id IN $ids OR s.path_template IN $ids))
+           OR (s:ApiContract AND (s.contract_id IN $ids OR s.path_template IN $ids)))
+          AND ($repo_id IS NULL OR s.repository_id = $repo_id OR s.file_path CONTAINS $repo_id)
         RETURN labels(s) AS labels, coalesce(s.symbol_id, s.endpoint_id, s.call_id, s.contract_id) AS symbol_id,
                s.name AS name, s.qualified_name AS qualified_name,
                s.file_path AS file_path, s.start_line AS start_line, s.end_line AS end_line,
                s.docstring AS docstring
         """
-        return self.client.execute_read(query, {"ids": identifiers})
+        return self.client.execute_read(query, {"ids": identifiers, "repo_id": repository_id})
 
     def find_callers(self, symbol_name_or_qn: str) -> list[dict[str, Any]]:
         """Find functions or methods that call the specified symbol."""
@@ -265,14 +267,24 @@ class GraphQueryManager:
                 hops = 3
 
         limit_val = max(1, min(limit, 500))
-        query = f"""
-        MATCH path = (n)-[*1..{hops}]-(m)
-        WHERE (n.name CONTAINS $id OR n.qualified_name CONTAINS $id
-           OR (n:ApiEndpoint AND (n.endpoint_id = $id OR n.path = $id))
-           OR (n:ApiClientCall AND (n.call_id = $id OR n.url = $id))
-           OR (n:ApiContract AND (n.contract_id = $id OR n.path_template = $id)))
-          AND ($repo_id IS NULL OR n.repository_id = $repo_id OR n.repository_id IS NULL)
-          AND ($repo_id IS NULL OR m.repository_id = $repo_id OR m.repository_id IS NULL)
+
+        # Parse identifier: e.g. "POST /api/v1/incidents" -> method="POST", path="/api/v1/incidents"
+        clean_id = identifier.strip()
+        parsed_method = None
+        parsed_path = clean_id
+        parts = clean_id.split()
+        if len(parts) >= 2 and parts[0].upper() in ("GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"):
+            parsed_method = parts[0].upper()
+            parsed_path = parts[1].strip()
+
+        # 1. Try exact ApiEndpoint match first to prevent sibling routes from polluting results
+        exact_query = f"""
+        MATCH (n:ApiEndpoint)
+        WHERE (n.path = $path AND ($method IS NULL OR n.http_method = $method))
+           OR n.name = $id OR n.endpoint_id = $id
+        WITH n
+        MATCH path = (n)-[:HANDLED_BY|HANDLES|CALLS|MATCHES_ENDPOINT|MATCHES_CONTRACT|IMPLEMENTS_CONTRACT|INHERITS|IMPLEMENTS*1..{hops}]-(m)
+        WHERE ($repo_id IS NULL OR m.repository_id = $repo_id OR m.file_path CONTAINS $repo_id)
         RETURN [node in nodes(path) | {{
             name: node.name,
             qualified_name: node.qualified_name,
@@ -284,9 +296,69 @@ class GraphQueryManager:
         }}] AS path_nodes,
         [rel in relationships(path) | type(rel)] AS path_relationships,
         length(path) AS hop_count
+        ORDER BY hop_count DESC
         LIMIT {limit_val}
         """
-        raw_paths = self.client.execute_read(query, {"id": identifier, "repo_id": repository_id})
+        raw_paths = self.client.execute_read(
+            exact_query,
+            {
+                "id": clean_id,
+                "path": parsed_path,
+                "method": parsed_method,
+                "repo_id": repository_id,
+            },
+        )
+
+        # 2. Fall back to broader candidate search if no exact endpoint matches
+        if not raw_paths:
+            query = f"""
+            MATCH (n)
+            WHERE (
+                n.name = $id OR n.qualified_name = $id OR n.symbol_id = $id
+                OR n.name CONTAINS $id OR n.qualified_name CONTAINS $id
+                OR (n:ApiEndpoint AND (
+                    n.endpoint_id = $id OR n.path = $id OR n.path = $path
+                    OR n.path ENDS WITH $path OR $path ENDS WITH n.path
+                    OR n.name CONTAINS $path OR n.qualified_name CONTAINS $path
+                ) AND ($method IS NULL OR n.http_method = $method))
+                OR (n:ApiClientCall AND (n.call_id = $id OR n.url = $id OR n.url = $path))
+                OR (n:ApiContract AND (n.contract_id = $id OR n.path_template = $id OR n.path_template = $path))
+            )
+            AND ($repo_id IS NULL OR n.repository_id = $repo_id OR n.file_path CONTAINS $repo_id)
+            WITH n
+            ORDER BY CASE 
+                WHEN (n:ApiEndpoint AND n.path = $path AND ($method IS NULL OR n.http_method = $method)) THEN 0
+                WHEN n.name = $id THEN 1
+                WHEN (n:ApiEndpoint AND n.path = $path) THEN 2
+                WHEN n.endpoint_id = $id THEN 3
+                ELSE 4
+            END ASC
+            LIMIT 25
+            MATCH path = (n)-[:HANDLED_BY|HANDLES|CALLS|MATCHES_ENDPOINT|MATCHES_CONTRACT|IMPLEMENTS_CONTRACT|INHERITS|IMPLEMENTS*1..{hops}]-(m)
+            WHERE ($repo_id IS NULL OR m.repository_id = $repo_id OR m.file_path CONTAINS $repo_id)
+            RETURN [node in nodes(path) | {{
+                name: node.name,
+                qualified_name: node.qualified_name,
+                file_path: node.file_path,
+                symbol_id: coalesce(node.symbol_id, node.endpoint_id, node.call_id, node.contract_id),
+                labels: labels(node),
+                start_line: node.start_line,
+                end_line: node.end_line
+            }}] AS path_nodes,
+            [rel in relationships(path) | type(rel)] AS path_relationships,
+            length(path) AS hop_count
+            ORDER BY hop_count DESC
+            LIMIT {limit_val}
+            """
+            raw_paths = self.client.execute_read(
+                query,
+                {
+                    "id": clean_id,
+                    "path": parsed_path,
+                    "method": parsed_method,
+                    "repo_id": repository_id,
+                },
+            )
 
         # Deduplicate paths deterministically based on canonical sequence
         seen_signatures: set[tuple] = set()

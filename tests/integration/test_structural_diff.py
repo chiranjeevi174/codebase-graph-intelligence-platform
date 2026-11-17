@@ -30,8 +30,8 @@ def temp_git_repo(tmp_path):
         )
         return res.stdout.strip()
 
-    # 1. Initialize git repo
-    run_git(["init"])
+    # 1. Initialize git repo with explicit main branch
+    run_git(["init", "-b", "main"])
     run_git(["config", "user.name", "Test User"])
     run_git(["config", "user.email", "test@example.com"])
 
@@ -42,6 +42,7 @@ def temp_git_repo(tmp_path):
 
     run_git(["add", "."])
     run_git(["commit", "-m", "Commit A"])
+    run_git(["branch", "-M", "main"])
     commit_a = run_git(["rev-parse", "HEAD"])
 
     # 3. Copy V2 files and commit
@@ -51,6 +52,7 @@ def temp_git_repo(tmp_path):
 
     run_git(["add", "."])
     run_git(["commit", "-m", "Commit B"])
+    run_git(["branch", "feature"])
     commit_b = run_git(["rev-parse", "HEAD"])
 
     return str(repo_dir), commit_a, commit_b

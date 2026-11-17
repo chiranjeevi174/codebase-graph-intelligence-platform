@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Codebase Intelligence</title>
-  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=2.3">
-  <link rel="stylesheet" href="css/styles.css?v=2.3">
+  <title>Code Graph Intelligence Platform</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=3.0">
+  <link rel="stylesheet" href="css/styles.css?v=3.0">
   <!-- Cytoscape.js Graph Library -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.28.1/cytoscape.min.js"></script>
 </head>
@@ -16,17 +16,29 @@
     <div class="header-brand-group">
       <div class="brand">
         <div class="brand-icon">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="5" r="3"/>
-            <circle cx="5" cy="18" r="3"/>
-            <circle cx="19" cy="18" r="3"/>
-            <line x1="12" y1="8" x2="5" y2="15"/>
-            <line x1="12" y1="8" x2="19" y2="15"/>
+          <!-- Custom Minimal Code Graph Intelligence Brand Symbol -->
+          <svg viewBox="0 0 32 32" width="22" height="22" fill="none">
+            <line x1="16" y1="16" x2="16" y2="6" stroke="#4F8CFF" stroke-width="2" stroke-linecap="round"/>
+            <line x1="16" y1="16" x2="26" y2="16" stroke="#4F8CFF" stroke-width="2" stroke-linecap="round"/>
+            <line x1="16" y1="16" x2="16" y2="26" stroke="#4F8CFF" stroke-width="2" stroke-linecap="round"/>
+            <line x1="16" y1="16" x2="6" y2="16" stroke="#4F8CFF" stroke-width="2" stroke-linecap="round"/>
+            <line x1="16" y1="16" x2="23.5" y2="8.5" stroke="#A78BFA" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="2 2"/>
+            <line x1="16" y1="16" x2="8.5" y2="23.5" stroke="#A78BFA" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="2 2"/>
+            <line x1="23.5" y1="8.5" x2="26" y2="16" stroke="#4F8CFF" stroke-width="1.4" stroke-opacity="0.6"/>
+            <line x1="6" y1="16" x2="8.5" y2="23.5" stroke="#4F8CFF" stroke-width="1.4" stroke-opacity="0.6"/>
+            <circle cx="16" cy="6" r="2.8" fill="#4F8CFF"/>
+            <circle cx="26" cy="16" r="2.8" fill="#4F8CFF"/>
+            <circle cx="16" cy="26" r="2.8" fill="#4F8CFF"/>
+            <circle cx="6" cy="16" r="2.8" fill="#4F8CFF"/>
+            <circle cx="23.5" cy="8.5" r="2.2" fill="#A78BFA"/>
+            <circle cx="8.5" cy="23.5" r="2.2" fill="#A78BFA"/>
+            <circle cx="16" cy="16" r="4.2" fill="#4F8CFF" stroke="#F1F5FB" stroke-width="1.5"/>
+            <circle cx="16" cy="16" r="1.8" fill="#F1F5FB"/>
           </svg>
         </div>
         <div class="brand-text">
-          <span class="brand-name">Codebase Intelligence</span>
-          <span class="brand-tag">v2.0 Enterprise</span>
+          <span class="brand-name">Code Graph Intelligence</span>
+          <span class="brand-tag">Enterprise Intelligence Platform</span>
         </div>
       </div>
     </div>
@@ -44,20 +56,20 @@
       <div class="input-with-tooltip" data-tooltip-title="Branch Name" data-tooltip-body="Target Git branch context used for AST parsing and graph navigation.">
         <input type="text" id="header-branch-input" class="text-input git-input" value="main" placeholder="branch">
       </div>
-      <div class="input-with-tooltip" data-tooltip-title="Git Commit (HEAD)" data-tooltip-body="The latest commit in the selected Git repository. It represents the current active codebase state.">
+      <div class="input-with-tooltip" data-tooltip-title="Git Commit (HEAD)" data-tooltip-body="The latest commit in the selected Git repository representing the active codebase state.">
         <input type="text" id="header-commit-input" class="text-input git-input" value="HEAD" placeholder="commit">
       </div>
     </div>
 
     <div class="header-system-group">
-      <div id="health-badge" class="status-badge" data-tooltip-title="System Health" data-tooltip-body="Real-time connectivity status for backend API and Neo4j/Qdrant services.">
+      <div id="health-badge" class="status-badge" data-tooltip-title="System Health" data-tooltip-body="Real-time connectivity status for backend API, Neo4j Graph, and Qdrant vector retrieval services.">
         <span class="status-dot"></span> Checking System...
       </div>
-      <div id="model-llm-badge" class="model-badge" data-tooltip-title="Language Model (LLM)" data-tooltip-body="Used as the language model for understanding code-related questions and generating grounded answers from retrieved repository evidence.">
+      <div id="model-llm-badge" class="model-badge" data-tooltip-title="Language Model (LLM)" data-tooltip-body="Language model provider used for code understanding and generating grounded evidence-backed answers.">
         <span class="model-icon">🤖</span>
         <span id="model-llm-name">openai</span>
       </div>
-      <div id="model-emb-badge" class="model-badge" data-tooltip-title="Embedding Model" data-tooltip-body="Used to convert code and text into embeddings so semantically relevant repository content can be retrieved from Qdrant.">
+      <div id="model-emb-badge" class="model-badge" data-tooltip-title="Embedding Model" data-tooltip-body="Model used to convert code entities and chunks into vector representations for semantic retrieval in Qdrant.">
         <span class="model-icon">🧬</span>
         <span id="model-emb-name">BAAI/bge-small-en-v1.5</span>
       </div>
@@ -74,7 +86,7 @@
       </div>
 
       <div class="panel-body">
-        <!-- Navigation Tabs with Explanatory Tooltips -->
+        <!-- Navigation Tabs: Exactly 6 Primary Features -->
         <nav class="nav-tabs">
           <button class="nav-tab active" data-tab="query" data-tooltip-title="Codebase Query (Graph RAG)" data-tooltip-body="Ask natural language questions about architecture, symbols, and workflows with grounded AST evidence and Reciprocal Rank Fusion (RRF).">
             <span class="tab-icon">💬</span>
@@ -83,32 +95,39 @@
               <span class="tab-sub">Graph RAG + Evidence</span>
             </div>
           </button>
-          <button class="nav-tab" data-tab="impact" data-tooltip-title="Static Impact Analysis" data-tooltip-body="Traverse the Neo4j dependency graph to evaluate blast radius, direct and transitive callers, and affected files across configurable hop depths.">
+          <button class="nav-tab" data-tab="impact" data-tooltip-title="Impact Analysis" data-tooltip-body="Traverse the Neo4j dependency graph to evaluate blast radius, direct and transitive callers, and affected files across configurable hop depths.">
             <span class="tab-icon">🔍</span>
             <div class="tab-text">
               <span class="tab-title">Impact Analysis</span>
               <span class="tab-sub">Static Reachability</span>
             </div>
           </button>
-          <button class="nav-tab" data-tab="apiflow" data-tooltip-title="Cross-Language API Flow" data-tooltip-body="Trace HTTP endpoints, OpenAPI contract schemas, and client invocations across multilingual backend and frontend services.">
+          <button class="nav-tab" data-tab="apiflow" data-tooltip-title="API Flow Analysis" data-tooltip-body="Trace HTTP endpoints, OpenAPI contract schemas, and client invocations across multilingual backend and frontend services.">
             <span class="tab-icon">🌐</span>
             <div class="tab-text">
               <span class="tab-title">API Flow Analysis</span>
               <span class="tab-sub">Cross-Language Tracing</span>
             </div>
           </button>
-          <button class="nav-tab" data-tab="diff" data-tooltip-title="Structural Git Diff" data-tooltip-body="Perform AST signature diffing and dependency propagation analysis between Git revisions (e.g. HEAD~1 and HEAD).">
-            <span class="tab-icon">🔀</span>
-            <div class="tab-text">
-              <span class="tab-title">Structural Git Diff</span>
-              <span class="tab-sub">AST Signature Diffs</span>
-            </div>
-          </button>
-          <button class="nav-tab" data-tab="pr" data-tooltip-title="PR Risk & Evidence Analysis" data-tooltip-body="Automate pull request risk scoring, breaking change detection, and evidence-grounded review comments.">
+          <button class="nav-tab" data-tab="pr" data-tooltip-title="Pull Request Analysis" data-tooltip-body="Automate evidence-based pull request review, risk scoring, breaking change detection, and reviewer feedback.">
             <span class="tab-icon">⚡</span>
             <div class="tab-text">
-              <span class="tab-title">PR Analysis</span>
-              <span class="tab-sub">Risk & Impact Verification</span>
+              <span class="tab-title">Pull Request Analysis</span>
+              <span class="tab-sub">Evidence-Based Review</span>
+            </div>
+          </button>
+          <button class="nav-tab" data-tab="architecture" data-tooltip-title="Architecture Intelligence & Visualization" data-tooltip-body="Discover project packages, directories, component dependencies, architectural layers, and interactive topology.">
+            <span class="tab-icon">🏛️</span>
+            <div class="tab-text">
+              <span class="tab-title">Architecture Intelligence</span>
+              <span class="tab-sub">Discovery & Visualization</span>
+            </div>
+          </button>
+          <button class="nav-tab" data-tab="quality-security" data-tooltip-title="Code Quality & Security Analysis" data-tooltip-body="Inspect code smells, complexity, maintainability concerns, hardcoded secrets, SQL injection, and security vulnerabilities.">
+            <span class="tab-icon">🛡️</span>
+            <div class="tab-text">
+              <span class="tab-title">Code Quality & Security</span>
+              <span class="tab-sub">Vulnerabilities & Smells</span>
             </div>
           </button>
         </nav>
@@ -126,15 +145,19 @@
           </div>
 
           <div class="form-group">
-            <label class="form-label" for="ingest-url-input">Or GitHub Repository URL:</label>
+            <label class="form-label" for="ingest-url-input">Or GitHub URL:</label>
             <input type="text" id="ingest-url-input" class="text-input" placeholder="https://github.com/org/repo">
           </div>
 
           <div class="form-row">
-            <input type="text" id="ingest-branch-input" class="text-input" placeholder="branch (optional)" style="flex:1;">
-            <label class="checkbox-label" data-tooltip-title="Force Re-Index" data-tooltip-body="Forces the repository to be parsed, graph-indexed, and embedded again even when an existing index is already cached.">
-              <input type="checkbox" id="ingest-force-input"> Force
-            </label>
+            <div class="form-group" style="flex:1;">
+              <label class="form-label" for="ingest-branch-input">Branch:</label>
+              <input type="text" id="ingest-branch-input" class="text-input" placeholder="main">
+            </div>
+            <div class="form-group" style="display:flex; align-items:center; gap:6px; margin-top:16px;">
+              <input type="checkbox" id="ingest-force-input">
+              <label class="form-label" for="ingest-force-input" style="cursor:pointer;" title="Force re-parsing and re-indexing">Force</label>
+            </div>
           </div>
 
           <button id="btn-ingest-repo" class="btn btn-primary btn-block">
@@ -142,92 +165,48 @@
           </button>
         </div>
 
-        <!-- Indexed Repositories List Card -->
+        <!-- Indexed Repositories Registry Card -->
         <div class="card">
           <div class="card-title">
             <span>Indexed Repositories</span>
-            <span class="info-help" data-tooltip-title="Repository Storage" data-tooltip-body="Repositories currently indexed in Neo4j and Qdrant available for semantic search and graph querying.">ⓘ</span>
+            <span class="tag tag-purple">Active Index</span>
           </div>
-          <div id="repo-list-container" class="repo-list">
-            <!-- Dynamically populated -->
+          <div id="repo-list-container" class="repo-list-container">
+            <!-- Dynamically populated via /repositories -->
           </div>
         </div>
+
       </div>
     </aside>
 
-    <!-- Center Interactive Workspace -->
+    <!-- Center Workspace Area -->
     <main class="workspace">
 
       <!-- View 1: Codebase Query (Graph RAG) -->
       <section id="view-query" class="workspace-view active">
-        <div class="query-box card">
+        <div class="card query-box">
           <div class="card-title">
-            <div class="title-with-badge">
-              <span>Ask About Codebase</span>
-              <span class="tag tag-purple">Graph RAG + RRF</span>
-            </div>
+            <span>Natural Language Codebase Query</span>
+            <span class="tag tag-blue">Graph RAG + RRF</span>
           </div>
-
-          <textarea id="query-input" class="text-input query-textarea" rows="3" placeholder="Ask a natural language query about the codebase architecture, symbols, or flow..."></textarea>
-
+          <textarea id="query-input" class="text-input query-textarea" placeholder="Ask anything about architecture, workflows, classes, APIs, or database models..."></textarea>
+          
           <div class="prompt-suggestions-wrapper">
-            <div class="suggestions-header">Suggested Questions for Selected Repository:</div>
+            <div class="suggestions-header">Repository Questions:</div>
             <div id="query-suggestions-list" class="prompt-suggestions">
               <!-- Dynamically populated per repository -->
             </div>
           </div>
 
-          <div class="action-bar">
+          <div class="control-row" style="justify-content: flex-end; margin-top:4px;">
             <button id="btn-run-query" class="btn btn-primary">
-              Send Question
+              Run Codebase Query
             </button>
           </div>
         </div>
 
-        <!-- Grounded Answer Card -->
-        <div id="answer-container" class="answer-box" style="display:none;">
-          <div class="answer-header">
-            <div class="answer-title-group">
-              <span class="answer-title">Grounded AI Answer</span>
-              <div id="validation-badge" class="status-badge">
-                <span class="status-dot"></span> Validated Evidence
-              </div>
-            </div>
-          </div>
-          <div id="answer-text" class="answer-content"></div>
-
-          <div class="sources-section">
-            <div class="sources-header">
-              <span>Cited Source References (Click to view code):</span>
-            </div>
-            <div id="sources-list" class="sources-list"></div>
-          </div>
-        </div>
-
-        <!-- Interactive Graph Canvas -->
-        <div class="graph-container">
-          <div class="graph-header-bar">
-            <span class="graph-header-title">Code Graph Subgraph & Dependency Topology</span>
-            <div class="graph-controls-overlay">
-              <button id="btn-zoom-in" class="icon-btn" title="Zoom In">+</button>
-              <button id="btn-zoom-out" class="icon-btn" title="Zoom Out">-</button>
-              <button id="btn-zoom-reset" class="icon-btn" title="Fit to View">⟲</button>
-              <button id="btn-zoom-fullscreen" class="icon-btn" title="Open graph in full screen" data-tooltip-title="Full Screen Graph" data-tooltip-body="Open graph in full screen view">⛶</button>
-            </div>
-          </div>
-          <div id="cy-canvas"></div>
-        </div>
-
-        <!-- Debug Trace Panel -->
-        <div class="card debug-card">
-          <details>
-            <summary class="debug-summary">
-              🔍 Retrieval Debug & Reasoning Trace (Graph / Qdrant / RRF)
-            </summary>
-            <div id="debug-trace-container" class="debug-content">
-              <em style="color:var(--text-muted); font-size:12px;">Run a query to inspect retrieval intent, entity resolution, and RRF rank fusion metrics.</em>
-            </div>
-          </details>
+        <div id="query-results" class="results-container">
+          <em style="color:var(--text-muted)">Submit a question above to retrieve grounded code evidence from Neo4j and Qdrant.</em>
         </div>
       </section>
 
@@ -235,28 +214,26 @@
       <section id="view-impact" class="workspace-view">
         <div class="card">
           <div class="card-title">
-            <span>Static Code Impact Analysis</span>
-            <span class="tag tag-amber">Neo4j Graph Traversal</span>
+            <span>Static Code Impact & Reachability</span>
+            <span class="tag tag-blue">Dependency Propagation</span>
           </div>
 
           <div class="control-row">
-            <input type="text" id="impact-symbol-input" class="text-input" placeholder="Target Symbol Name (e.g. UserService, process_payment)" style="flex:1;">
-            <div class="input-with-tooltip" data-tooltip-title="Hop Depth" data-tooltip-body="Controls how many graph relationship levels Impact Analysis traverses (1 to All).">
-              <select id="impact-hops-input" class="select-input" style="width:120px;">
-                <option value="1">1 Hop</option>
-                <option value="2" selected>2 Hops</option>
-                <option value="3">3 Hops</option>
-                <option value="all">All Hops</option>
-              </select>
-            </div>
+            <input type="text" id="impact-symbol-input" class="text-input" placeholder="Enter symbol or class (e.g. UserService, create_user)...">
+            <select id="impact-hops-input" class="select-input" style="width: 140px;">
+              <option value="1">1 Hop Depth</option>
+              <option value="2" selected>2 Hops Depth</option>
+              <option value="3">3 Hops Depth</option>
+              <option value="all">All Hops</option>
+            </select>
             <button id="btn-run-impact" class="btn btn-primary">
-              Run Impact Analysis
+              Analyze Impact
             </button>
           </div>
         </div>
 
         <div id="impact-results" class="results-container">
-          <em style="color:var(--text-muted)">Enter a symbol above to analyze static dependencies and affected components.</em>
+          <em style="color:var(--text-muted)">Enter a symbol name to compute direct and transitive dependency blast radius.</em>
         </div>
       </section>
 
@@ -264,12 +241,18 @@
       <section id="view-apiflow" class="workspace-view">
         <div class="card">
           <div class="card-title">
-            <span>Cross-Language API & Contract Flow</span>
-            <span class="tag tag-blue">OpenAPI + Endpoints</span>
+            <span>Cross-Language API Flow Tracing</span>
+            <span class="tag tag-blue">Client → Endpoint → Contract</span>
           </div>
 
           <div class="control-row">
-            <input type="text" id="apiflow-input" class="text-input" placeholder="API Path or Symbol (e.g. /api/users, HttpClient, InventoryService)" style="flex:1;">
+            <input type="text" id="apiflow-input" class="text-input" placeholder="Enter path template or symbol (e.g. /api/users, /inventory, orders)...">
+            <select id="apiflow-hops-input" class="select-input" style="width: 140px;">
+              <option value="2">2 Hops</option>
+              <option value="3" selected>3 Hops</option>
+              <option value="4">4 Hops</option>
+              <option value="all">All Hops</option>
+            </select>
             <button id="btn-run-apiflow" class="btn btn-primary">
               Trace API Flow
             </button>
@@ -281,50 +264,12 @@
         </div>
       </section>
 
-      <!-- View 4: Structural Git Diff -->
-      <section id="view-diff" class="workspace-view">
-        <div class="card form-card">
-          <div class="card-title">
-            <span>Structural Git Change Analysis</span>
-            <span class="tag tag-purple">AST Diff</span>
-          </div>
-
-          <div class="form-section-box">
-            <div class="form-section-header">GIT REVISION COMPARISON</div>
-            <div class="form-grid-2">
-              <div class="form-group">
-                <label class="form-label" for="diff-base-input">Base Revision</label>
-                <div class="input-with-tooltip" data-tooltip-title="Base Revision (HEAD~1)" data-tooltip-body="Commit immediately before HEAD used for baseline comparison.">
-                  <input type="text" id="diff-base-input" class="text-input" value="HEAD~1" placeholder="Base Ref (e.g. HEAD~1)">
-                </div>
-              </div>
-              <div class="form-group">
-                <label class="form-label" for="diff-target-input">Head Revision</label>
-                <div class="input-with-tooltip" data-tooltip-title="Head Revision (HEAD)" data-tooltip-body="Current target revision containing code modifications (e.g. HEAD or feature branch).">
-                  <input type="text" id="diff-target-input" class="text-input" value="HEAD" placeholder="Target Ref (e.g. HEAD)">
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="form-action-row" style="justify-content: flex-end;">
-            <button id="btn-run-diff" class="btn btn-primary">
-              🔀 Analyze Structural Diff
-            </button>
-          </div>
-        </div>
-
-        <div id="diff-results" class="results-container">
-          <em style="color:var(--text-muted)">Click Analyze Structural Diff to compare code revisions across AST signatures and dependency graphs.</em>
-        </div>
-      </section>
-
-      <!-- View 5: PR Analysis -->
+      <!-- View 4: PR Analysis (Evidence-Based Review) -->
       <section id="view-pr" class="workspace-view">
         <div class="card form-card">
           <div class="card-title">
             <span>Pull Request Evidence & Impact Analysis</span>
-            <span class="tag tag-emerald">GitHub / GitLab</span>
+            <span class="tag tag-emerald">Evidence-Based Review</span>
           </div>
 
           <div class="form-sections-grid">
@@ -360,43 +305,107 @@
                 </div>
                 <div class="form-group">
                   <label class="form-label" for="pr-target-input">Head Revision</label>
-                  <div class="input-with-tooltip" data-tooltip-title="Head Revision (HEAD)" data-tooltip-body="Latest commit / current Git revision representing the active PR head state.">
-                    <input type="text" id="pr-target-input" class="text-input" value="HEAD" placeholder="Head SHA (e.g. HEAD)">
+                  <div class="input-with-tooltip" data-tooltip-title="Head Revision (HEAD)" data-tooltip-body="Current target revision containing proposed code changes.">
+                    <input type="text" id="pr-target-input" class="text-input" value="HEAD" placeholder="Target SHA (e.g. HEAD)">
                   </div>
                 </div>
+              </div>
+              <div class="form-group" style="display:flex; align-items:center; gap:8px; margin-top:12px;">
+                <input type="checkbox" id="pr-dryrun-input" checked>
+                <label class="form-label" for="pr-dryrun-input" style="cursor:pointer;" title="Do not post comments to GitHub/GitLab">Dry Run Mode (Inspect locally without posting comment)</label>
               </div>
             </div>
           </div>
 
-          <div class="form-action-row">
-            <label class="checkbox-label" data-tooltip-title="Dry Run Execution" data-tooltip-body="Runs PR analysis without posting the resulting review comment.">
-              <input type="checkbox" id="pr-dryrun-input" checked> Dry Run
-            </label>
+          <div class="form-action-row" style="justify-content: flex-end;">
             <button id="btn-run-pr" class="btn btn-primary">
-              ⚡ Analyze Pull Request
+              Run PR Analysis
             </button>
           </div>
         </div>
 
         <div id="pr-results" class="results-container">
-          <em style="color:var(--text-muted)">Click Analyze Pull Request to generate an evidence-backed structural PR analysis report.</em>
+          <em style="color:var(--text-muted)">Configure pull request context above to execute asynchronous evidence-backed PR analysis.</em>
+        </div>
+      </section>
+
+      <!-- View 5: Architecture Intelligence & Visualization (NEW) -->
+      <section id="view-architecture" class="workspace-view">
+        <div class="card">
+          <div class="card-title">
+            <span>Architecture Discovery & Intelligence</span>
+            <span class="tag tag-purple">Knowledge Graph Modeling</span>
+          </div>
+
+          <div class="control-row">
+            <select id="architecture-level-select" class="select-input" style="width: 220px;">
+              <option value="overview" selected>Overview (Packages & Layers)</option>
+              <option value="detailed">Detailed (Files, Classes & Endpoints)</option>
+            </select>
+            <button id="btn-run-architecture" class="btn btn-primary">
+              Discover Architecture
+            </button>
+          </div>
+        </div>
+
+        <div id="architecture-results" class="results-container">
+          <em style="color:var(--text-muted)">Click Discover Architecture to extract project modules, architectural layers, entry points, and dependency topology.</em>
+        </div>
+      </section>
+
+      <!-- View 6: Code Quality & Security Analysis (NEW) -->
+      <section id="view-quality-security" class="workspace-view">
+        <div class="card">
+          <div class="card-title">
+            <span>Code Quality & Security Vulnerability Analysis</span>
+            <span class="tag tag-rose">Static AST + Secret Scanner</span>
+          </div>
+
+          <div class="control-row">
+            <select id="qs-category-select" class="select-input" style="width: 200px;">
+              <option value="all" selected>All Categories (Quality + Security)</option>
+              <option value="security">Security Only</option>
+              <option value="quality">Quality Only</option>
+            </select>
+            <button id="btn-run-quality-security" class="btn btn-primary">
+              Run Quality & Security Scan
+            </button>
+          </div>
+        </div>
+
+        <div id="quality-security-results" class="results-container">
+          <em style="color:var(--text-muted)">Click Run Quality & Security Scan to inspect codebase for vulnerabilities, smells, and hardcoded secrets.</em>
         </div>
       </section>
 
     </main>
 
-    <!-- Right Inspector Panel -->
+    <!-- Right Contextual Inspector Panel -->
     <aside class="panel panel-right">
       <div class="panel-header">
-        <span>Graph Inspector</span>
+        <span>Graph & Entity Inspector</span>
       </div>
 
       <div class="panel-body">
-        <!-- Node Details Section -->
+        <!-- Interactive Cytoscape Subgraph Canvas Card -->
+        <div class="card graph-card">
+          <div class="card-title">
+            <span>Knowledge Graph Canvas</span>
+            <div class="graph-tools">
+              <button id="btn-zoom-in" class="icon-btn" title="Zoom In">+</button>
+              <button id="btn-zoom-out" class="icon-btn" title="Zoom Out">-</button>
+              <button id="btn-zoom-reset" class="icon-btn" title="Reset Zoom">⟲</button>
+              <button id="btn-zoom-fullscreen" class="icon-btn" title="Full Screen Graph View">⛶</button>
+            </div>
+          </div>
+          <div id="cy-canvas" class="cy-canvas"></div>
+        </div>
+
+        <!-- Node & Symbol Properties Inspector Card -->
         <div id="node-details-container">
           <div class="empty-inspector">
             <span class="inspector-icon">🎯</span>
-            <p>Click any graph node on the canvas to inspect symbol properties, qualified name, line ranges, and source code links.</p>
+            <p>Click any graph node or analysis finding to inspect symbol properties, qualified names, line numbers, and source links.</p>
           </div>
         </div>
 
@@ -404,29 +413,29 @@
         <div class="card legend-card">
           <div class="card-title">Node Type Legend</div>
           <div class="legend-list">
-            <div class="legend-item" data-tooltip-title="File Node" data-tooltip-body="Source file container in the indexed repository.">
-              <span class="legend-dot" style="background:var(--node-file); color:var(--node-file);"></span>
+            <div class="legend-item" data-tooltip-title="File Node (#60A5FA)" data-tooltip-body="Source file container in the indexed repository.">
+              <span class="legend-dot" style="background:#60A5FA; color:#60A5FA;"></span>
               <span class="legend-label">File Node</span>
             </div>
-            <div class="legend-item" data-tooltip-title="Class Node" data-tooltip-body="Class, struct, or interface type definition.">
-              <span class="legend-dot" style="background:var(--node-class); color:var(--node-class);"></span>
+            <div class="legend-item" data-tooltip-title="Class Node (#C084FC)" data-tooltip-body="Class, struct, or interface type definition.">
+              <span class="legend-dot" style="background:#C084FC; color:#C084FC;"></span>
               <span class="legend-label">Class Node</span>
             </div>
-            <div class="legend-item" data-tooltip-title="Function / Method Node" data-tooltip-body="Executable function, static method, or class method.">
-              <span class="legend-dot" style="background:var(--node-function); color:var(--node-function);"></span>
-              <span class="legend-label">Function / Method Node</span>
+            <div class="legend-item" data-tooltip-title="Function / Method Node (#34D399)" data-tooltip-body="Executable function, static method, or class method.">
+              <span class="legend-dot" style="background:#34D399; color:#34D399;"></span>
+              <span class="legend-label">Function / Method</span>
             </div>
-            <div class="legend-item" data-tooltip-title="API Endpoint Node" data-tooltip-body="Backend HTTP / REST route handler exposing an API.">
-              <span class="legend-dot" style="background:var(--node-endpoint); color:var(--node-endpoint);"></span>
-              <span class="legend-label">API Endpoint Node</span>
+            <div class="legend-item" data-tooltip-title="API Endpoint Node (#FBBF24)" data-tooltip-body="Backend HTTP / REST route handler exposing an API.">
+              <span class="legend-dot" style="background:#FBBF24; color:#FBBF24;"></span>
+              <span class="legend-label">API Endpoint</span>
             </div>
-            <div class="legend-item" data-tooltip-title="API Client Call Node" data-tooltip-body="Client HTTP invocation (axios, fetch, requests, HttpClient).">
-              <span class="legend-dot" style="background:var(--node-client); color:var(--node-client);"></span>
-              <span class="legend-label">API Client Call Node</span>
+            <div class="legend-item" data-tooltip-title="API Client Call Node (#F472B6)" data-tooltip-body="Client HTTP invocation (axios, fetch, requests, HttpClient).">
+              <span class="legend-dot" style="background:#F472B6; color:#F472B6;"></span>
+              <span class="legend-label">API Client Call</span>
             </div>
-            <div class="legend-item" data-tooltip-title="API Contract Node" data-tooltip-body="OpenAPI / Swagger contract schema definition.">
-              <span class="legend-dot" style="background:var(--node-contract); color:var(--node-contract);"></span>
-              <span class="legend-label">API Contract Node</span>
+            <div class="legend-item" data-tooltip-title="API Contract Node (#22D3EE)" data-tooltip-body="OpenAPI / Swagger contract schema definition.">
+              <span class="legend-dot" style="background:#22D3EE; color:#22D3EE;"></span>
+              <span class="legend-label">API Contract</span>
             </div>
           </div>
         </div>
@@ -436,12 +445,12 @@
           <div class="card-title">Platform Capabilities</div>
           <ul class="capabilities-list">
             <li><span class="cap-marker">✦</span> Multi-hop Neo4j Graph RAG</li>
-            <li><span class="cap-marker">✦</span> Qdrant Vector Retrieval</li>
+            <li><span class="cap-marker">✦</span> Qdrant Semantic Vector Retrieval</li>
             <li><span class="cap-marker">✦</span> Reciprocal Rank Fusion (RRF)</li>
-            <li><span class="cap-marker">✦</span> Tree-sitter AST Parsing</li>
-            <li><span class="cap-marker">✦</span> Cross-Language API Resolution</li>
-            <li><span class="cap-marker">✦</span> Structural Signature Diff</li>
-            <li><span class="cap-marker">✦</span> Answer Groundedness Validation</li>
+            <li><span class="cap-marker">✦</span> Tree-sitter & AST Code Parsing</li>
+            <li><span class="cap-marker">✦</span> Architecture Intelligence & Discovery</li>
+            <li><span class="cap-marker">✦</span> Static Code Quality & Security Scanner</li>
+            <li><span class="cap-marker">✦</span> Evidence-Based PR Risk Review</li>
           </ul>
         </div>
       </div>
@@ -493,7 +502,7 @@
 
   <!-- Main ES Module Bootstrapper with cache-busting -->
   <script type="module">
-    import { initUI } from "./js/ui.js?v=2.3";
+    import { initUI } from "./js/ui.js?v=3.0";
     if (document.readyState === "loading") {
       document.addEventListener("DOMContentLoaded", () => initUI());
     } else {

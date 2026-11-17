@@ -2,8 +2,17 @@
 
 from fastapi import APIRouter, HTTPException
 
+from app.analysis.architecture_service import ArchitectureIntelligenceService
 from app.analysis.impact_service import CodeImpactAnalysisService
-from app.models.entities import ImpactAnalysisRequest, ImpactAnalysisResult
+from app.analysis.quality_security_service import CodeQualitySecurityService
+from app.models.entities import (
+    ArchitectureAnalysisRequest,
+    ArchitectureAnalysisResult,
+    ImpactAnalysisRequest,
+    ImpactAnalysisResult,
+    QualitySecurityAnalysisRequest,
+    QualitySecurityAnalysisResult,
+)
 
 router = APIRouter(tags=["Analysis"])
 
@@ -45,11 +54,49 @@ def analyze_api_flow(request: ApiFlowAnalysisRequest):
     """Analyze cross-language API flow connecting client calls, endpoints, and OpenAPI contracts."""
     try:
         qm = GraphQueryManager()
-        raw_paths = qm.find_api_flow(
-            identifier=request.path_or_symbol,
-            max_hops=request.max_hops,
-            repository_id=request.repository_id,
-        )
+        query_term = request.path_or_symbol.strip()
+        repo_id = request.repository_id
+
+        # If input looks like natural language query, extract endpoint and repo
+        if len(query_term.split()) > 2 or any(
+            w in query_term.lower() for w in ["trace", "flow", "explain", "request", "endpoint"]
+        ):
+            from app.reasoning.query_analyzer import QueryAnalyzer
+
+            analysis = QueryAnalyzer().analyze(query_term, repository_id=repo_id)
+            if not repo_id and analysis.repository_id:
+                repo_id = analysis.repository_id
+            target_terms = analysis.candidate_symbols or [query_term]
+        else:
+            target_terms = [query_term]
+
+        raw_paths: list[dict[str, Any]] = []
+        seen_sigs = set()
+        for term in target_terms:
+            paths = qm.find_api_flow(
+                identifier=term,
+                max_hops=request.max_hops,
+                repository_id=repo_id,
+            )
+            for p in paths:
+                nodes_seq = tuple(
+                    (n.get("qualified_name") or n.get("name") or n.get("symbol_id") or n.get("file_path"))
+                    for n in (p.get("path_nodes") or [])
+                    if isinstance(n, dict)
+                )
+                rels_seq = tuple(p.get("path_relationships") or [])
+                sig = (nodes_seq, rels_seq)
+                if sig not in seen_sigs:
+                    seen_sigs.add(sig)
+                    raw_paths.append(p)
+
+        if not raw_paths and target_terms != [query_term]:
+            raw_paths = qm.find_api_flow(
+                identifier=query_term,
+                max_hops=request.max_hops,
+                repository_id=repo_id,
+            )
+
         return ApiFlowAnalysisResponse(
             query_term=request.path_or_symbol,
             paths_found=len(raw_paths),
@@ -61,13 +108,37 @@ def analyze_api_flow(request: ApiFlowAnalysisRequest):
         raise HTTPException(status_code=500, detail=f"API flow analysis failed: {e}")
 
 
+@router.post("/analysis/architecture", response_model=ArchitectureAnalysisResult)
+def analyze_architecture(request: ArchitectureAnalysisRequest):
+    """Analyze repository architecture, package hierarchy, cross-module dependencies, and layers."""
+    try:
+        service = ArchitectureIntelligenceService()
+        return service.analyze_architecture(request)
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001 # FastAPI 500 boundary
+        raise HTTPException(status_code=500, detail=f"Architecture analysis failed: {e}")
+
+
+@router.post("/analysis/quality-security", response_model=QualitySecurityAnalysisResult)
+def analyze_quality_security(request: QualitySecurityAnalysisRequest):
+    """Analyze code quality smells, maintainability, and security vulnerabilities with credential masking."""
+    try:
+        service = CodeQualitySecurityService()
+        return service.analyze(request)
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001 # FastAPI 500 boundary
+        raise HTTPException(status_code=500, detail=f"Quality and security analysis failed: {e}")
+
+
 from app.diff.diff_analyzer import StructuralDiffAnalyzer
 from app.diff.diff_models import ChangeImpactResult, DiffRequest
 
 
-@router.post("/analysis/diff", response_model=ChangeImpactResult)
+@router.post("/analysis/diff", response_model=ChangeImpactResult, include_in_schema=False)
 def analyze_structural_diff(request: DiffRequest):
-    """Analyze structural Git diff, symbol changes, signature changes, and affected graph components."""
+    """Internal structural Git diff analysis endpoint retained for PR pipeline compatibility."""
     try:
         analyzer = StructuralDiffAnalyzer()
         result = analyzer.analyze_diff(request)
@@ -108,6 +179,7 @@ async def analyze_pull_request(
             repo_path=request.repo_path,
             dry_run=request.dry_run,
             max_hops=request.max_hops,
+            force=request.force,
             wait=False,
         )
         service = JobService()

@@ -39,11 +39,35 @@ class JobService:
 
         # Check existing job
         existing = self.repo.find_existing_job_by_key(idempotency_key)
-        if existing and existing.status in (PRJobStatus.QUEUED, PRJobStatus.RUNNING, PRJobStatus.COMPLETED):
-            logger.info(
-                f"[JobService] Reusing existing job '{existing.job_id}' for idempotency key '{idempotency_key}' (Status: {existing.status.value})."
-            )
-            return existing
+        if (
+            not getattr(request, "force", False)
+            and existing
+            and existing.status in (PRJobStatus.QUEUED, PRJobStatus.RUNNING)
+        ):
+            is_stale = False
+            ts_str = existing.started_at or existing.created_at
+            if ts_str:
+                try:
+                    ts = datetime.fromisoformat(ts_str)
+                    age_seconds = (datetime.now(UTC) - ts).total_seconds()
+                    timeout_threshold = max(float(self.settings.WORKER_JOB_TIMEOUT), 60.0)
+                    if age_seconds > timeout_threshold:
+                        is_stale = True
+                        logger.warning(
+                            f"[JobService] Existing job '{existing.job_id}' is stale ({age_seconds:.1f}s > {timeout_threshold}s in {existing.status.value}). Marking as FAILED and creating fresh job."
+                        )
+                        existing.status = PRJobStatus.FAILED
+                        existing.error = f"Job timed out after {int(age_seconds)}s without worker completion."
+                        existing.completed_at = datetime.now(UTC).isoformat()
+                        self.repo.update_job(existing)
+                except Exception as ex:  # noqa: BLE001 # Timestamp parse fallback boundary
+                    logger.debug(f"[JobService] Error parsing timestamp for job '{existing.job_id}': {ex}")
+
+            if not is_stale:
+                logger.info(
+                    f"[JobService] Reusing active in-flight job '{existing.job_id}' for idempotency key '{idempotency_key}' (Status: {existing.status.value})."
+                )
+                return existing
 
         # Generate deterministic job ID
         key_hash = hashlib.md5(f"{idempotency_key}:{datetime.now(UTC).timestamp()}".encode()).hexdigest()[:10]
