@@ -54,11 +54,49 @@ def analyze_api_flow(request: ApiFlowAnalysisRequest):
     """Analyze cross-language API flow connecting client calls, endpoints, and OpenAPI contracts."""
     try:
         qm = GraphQueryManager()
-        raw_paths = qm.find_api_flow(
-            identifier=request.path_or_symbol,
-            max_hops=request.max_hops,
-            repository_id=request.repository_id,
-        )
+        query_term = request.path_or_symbol.strip()
+        repo_id = request.repository_id
+
+        # If input looks like natural language query, extract endpoint and repo
+        if len(query_term.split()) > 2 or any(
+            w in query_term.lower() for w in ["trace", "flow", "explain", "request", "endpoint"]
+        ):
+            from app.reasoning.query_analyzer import QueryAnalyzer
+
+            analysis = QueryAnalyzer().analyze(query_term, repository_id=repo_id)
+            if not repo_id and analysis.repository_id:
+                repo_id = analysis.repository_id
+            target_terms = analysis.candidate_symbols or [query_term]
+        else:
+            target_terms = [query_term]
+
+        raw_paths: list[dict[str, Any]] = []
+        seen_sigs = set()
+        for term in target_terms:
+            paths = qm.find_api_flow(
+                identifier=term,
+                max_hops=request.max_hops,
+                repository_id=repo_id,
+            )
+            for p in paths:
+                nodes_seq = tuple(
+                    (n.get("qualified_name") or n.get("name") or n.get("symbol_id") or n.get("file_path"))
+                    for n in (p.get("path_nodes") or [])
+                    if isinstance(n, dict)
+                )
+                rels_seq = tuple(p.get("path_relationships") or [])
+                sig = (nodes_seq, rels_seq)
+                if sig not in seen_sigs:
+                    seen_sigs.add(sig)
+                    raw_paths.append(p)
+
+        if not raw_paths and target_terms != [query_term]:
+            raw_paths = qm.find_api_flow(
+                identifier=query_term,
+                max_hops=request.max_hops,
+                repository_id=repo_id,
+            )
+
         return ApiFlowAnalysisResponse(
             query_term=request.path_or_symbol,
             paths_found=len(raw_paths),
@@ -141,6 +179,7 @@ async def analyze_pull_request(
             repo_path=request.repo_path,
             dry_run=request.dry_run,
             max_hops=request.max_hops,
+            force=request.force,
             wait=False,
         )
         service = JobService()

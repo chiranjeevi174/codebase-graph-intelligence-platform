@@ -5,6 +5,12 @@ import hashlib
 from app.analysis.impact_service import CodeImpactAnalysisService
 from app.diff.diff_analyzer import StructuralDiffAnalyzer
 from app.diff.diff_models import DiffRequest
+from app.diff.git_diff_service import (
+    GitDiffError,
+    GitRevisionNotFoundError,
+    RepositoryNotFoundError,
+    resolve_repository_path,
+)
 from app.graph.graph_queries import GraphQueryManager
 from app.integrations.factory import PRProviderFactory
 from app.models.entities import ImpactAnalysisRequest
@@ -44,18 +50,49 @@ class PRAnalysisService:
         base_ref = request.base_ref
         target_ref = request.target_ref
 
+        # Intelligently resolve local repository path
+        resolved_repo_path = str(resolve_repository_path(repository=repo, repo_path=request.repo_path))
+
+        # Check provider PR metadata to resolve base/target refs if default or missing locally
+        if request.provider.lower() == "github" and pr_num:
+            from app.diff.git_diff_service import GitDiffService
+
+            try:
+                git_svc_pre = GitDiffService(repo_path=resolved_repo_path, repository=repo)
+                base_present = git_svc_pre.has_commit(base_ref)
+                target_present = git_svc_pre.has_commit(target_ref)
+
+                if not (base_present and target_present):
+                    provider_inst = PRProviderFactory.get_provider("github")
+                    pr_meta = provider_inst.get_pull_request(repo, pr_num)
+                    if pr_meta:
+                        if not base_present:
+                            if pr_meta.base_sha and pr_meta.base_sha != "HEAD~1":
+                                base_ref = pr_meta.base_sha
+                            elif pr_meta.target_branch:
+                                base_ref = pr_meta.target_branch
+
+                        if not target_present:
+                            if pr_meta.head_sha and pr_meta.head_sha != "HEAD":
+                                target_ref = pr_meta.head_sha
+                            elif pr_meta.source_branch:
+                                target_ref = pr_meta.source_branch
+            except Exception as ex:  # noqa: BLE001
+                logger.debug(f"[PRAnalysisService] Remote PR metadata check skipped: {ex}")
+
         # Generate deterministic run ID
         run_key = f"{request.provider}:{repo}:{pr_num}:{base_ref}:{target_ref}"
         run_id = f"pr_run_{hashlib.md5(run_key.encode('utf-8')).hexdigest()[:12]}"
 
         logger.info(
-            f"[PRAnalysisService:pr_analysis_started] Starting PR analysis for {repo} #{pr_num} (Run ID: {run_id})"
+            f"[PRAnalysisService:pr_analysis_started] Starting PR analysis for {repo} #{pr_num} "
+            f"(Run ID: {run_id}, path: '{resolved_repo_path}', base: '{base_ref}', target: '{target_ref}')"
         )
 
         # Step 1: Execute Structural Git Diff
         diff_req = DiffRequest(
             repository_id=request.repository.split("/")[-1],
-            repo_path=request.repo_path,
+            repo_path=resolved_repo_path,
             base_ref=base_ref,
             target_ref=target_ref,
             max_hops=request.max_hops,
@@ -65,9 +102,12 @@ class PRAnalysisService:
 
         try:
             diff_res = self.diff_analyzer.analyze_diff(diff_req)
-        except Exception as e:  # noqa: BLE001 — Fallback gracefully if diff analysis fails
-            logger.warning(f"[PRAnalysisService] Structural diff error for {repo}: {e}")
-            diff_res = None
+        except (GitRevisionNotFoundError, GitDiffError, RepositoryNotFoundError) as e:
+            logger.error(f"[PRAnalysisService] Git diff failed for {repo}: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"[PRAnalysisService] Structural diff analysis error for {repo}: {e}")
+            raise
 
         struct_diff = diff_res.structural_diff if diff_res else None
 
@@ -117,34 +157,20 @@ class PRAnalysisService:
         cross_language_impacts = []
         evidence_items = []
 
-        for sc in struct_diff.symbols_changed if struct_diff else []:
-            sym_name = sc.qualified_name or sc.symbol_name
-            try:
-                imp_res = self.impact_service.analyze_impact(
-                    ImpactAnalysisRequest(
-                        symbol=sym_name,
-                        repository_id=request.repository.split("/")[-1],
-                        max_hops=request.max_hops,
-                        max_nodes=request.max_nodes,
-                        max_relationships=request.max_relationships,
-                    )
-                )
-                for node in imp_res.direct_dependents + imp_res.transitive_dependents:
-                    affected_components_set.add(f"{node.qualified_name} ({node.file_path}:{node.start_line or 1})")
-                    if node.file_path and node.file_path != "unknown":
-                        affected_files_set.add(node.file_path)
-
-                # Cross-language API check
-                flows = self.graph_query_manager.find_api_flow(sym_name, max_hops=request.max_hops)
-                for fl in flows:
+        if diff_res and diff_res.impact:
+            affected_files_set.update(diff_res.affected_files)
+            for imp in diff_res.impact:
+                for dep in imp.direct_dependents + imp.transitive_dependents:
+                    affected_components_set.add(dep)
+                if imp.affected_api_endpoints:
                     cross_language_impacts.append(
                         {
-                            "symbol": sym_name,
-                            "description": f"Cross-language flow: {' -> '.join(fl.get('path_relationships', []))}",
+                            "symbol": imp.changed_symbol,
+                            "description": f"Affected API endpoints: {', '.join(imp.affected_api_endpoints)}",
                         }
                     )
-
-                # Collect static evidence
+            for sc in struct_diff.symbols_changed if struct_diff else []:
+                sym_name = sc.qualified_name or sc.symbol_name
                 evidence_items.append(
                     PRAnalysisEvidence(
                         symbol=sym_name,
@@ -154,8 +180,47 @@ class PRAnalysisService:
                         description=f"Symbol modified: {sc.symbol_name} ({sc.symbol_type})",
                     )
                 )
-            except Exception as ie:  # noqa: BLE001 — Impact analysis fallback per symbol
-                logger.debug(f"Impact check warning for {sym_name}: {ie}")
+        else:
+            for sc in struct_diff.symbols_changed if struct_diff else []:
+                sym_name = sc.qualified_name or sc.symbol_name
+                try:
+                    imp_res = self.impact_service.analyze_impact(
+                        ImpactAnalysisRequest(
+                            symbol=sym_name,
+                            repository_id=request.repository.split("/")[-1],
+                            max_hops=request.max_hops,
+                            max_nodes=request.max_nodes,
+                            max_relationships=request.max_relationships,
+                            include_explanation=False,
+                        )
+                    )
+                    for node in imp_res.direct_dependents + imp_res.transitive_dependents:
+                        affected_components_set.add(f"{node.qualified_name} ({node.file_path}:{node.start_line or 1})")
+                        if node.file_path and node.file_path != "unknown":
+                            affected_files_set.add(node.file_path)
+
+                    # Cross-language API check
+                    flows = self.graph_query_manager.find_api_flow(sym_name, max_hops=request.max_hops)
+                    for fl in flows:
+                        cross_language_impacts.append(
+                            {
+                                "symbol": sym_name,
+                                "description": f"Cross-language flow: {' -> '.join(fl.get('path_relationships', []))}",
+                            }
+                        )
+
+                    # Collect static evidence
+                    evidence_items.append(
+                        PRAnalysisEvidence(
+                            symbol=sym_name,
+                            file_path=sc.file_path,
+                            line_range=f"{sc.start_line}-{sc.end_line}",
+                            evidence_type="static_graph",
+                            description=f"Symbol modified: {sc.symbol_name} ({sc.symbol_type})",
+                        )
+                    )
+                except Exception as ie:  # noqa: BLE001 — Impact analysis fallback per symbol
+                    logger.debug(f"Impact check warning for {sym_name}: {ie}")
 
         logger.info(
             f"[PRAnalysisService:pr_impact_completed] Identified {len(affected_components_set)} affected components across {len(affected_files_set)} files."
@@ -197,9 +262,34 @@ class PRAnalysisService:
         # Step 5: Answer Validation
         is_valid = True
         try:
+            from app.models.entities import NormalizedSearchResult
+
+            grounding_sources = [
+                NormalizedSearchResult(
+                    id=f"git_diff_{idx}_{f}",
+                    file_path=f,
+                    content="",
+                    score=1.0,
+                    source_type="git_diff",
+                    repository_id=request.repository.split("/")[-1],
+                )
+                for idx, f in enumerate(changed_files)
+            ]
+            for idx, ev in enumerate(evidence_items):
+                grounding_sources.append(
+                    NormalizedSearchResult(
+                        id=f"evidence_{idx}_{ev.file_path}",
+                        file_path=ev.file_path,
+                        content=ev.description,
+                        score=1.0,
+                        source_type=ev.evidence_type,
+                        repository_id=request.repository.split("/")[-1],
+                    )
+                )
+
             is_valid, _ = self.answer_validator.validate(
                 answer=explanation or "",
-                fused_results=[],
+                fused_results=grounding_sources,
                 resolved_entities=[],
             )
         except Exception as ve:  # noqa: BLE001 # Non-blocking answer validation resilience boundary

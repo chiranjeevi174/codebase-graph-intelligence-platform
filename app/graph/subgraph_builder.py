@@ -47,19 +47,29 @@ class SubgraphBuilder:
         max_hops: int = 2,
         max_nodes: int = 50,
         max_relationships: int = 100,
+        repository_id: str | None = None,
     ) -> FocusedSubgraph:
         """Extract multi-hop neighborhood graph around a seed symbol with bounded limits."""
         hops = max(1, min(max_hops, 5))
         query = f"""
+        MATCH (center)
+        WHERE (
+            center.name = $id 
+            OR center.qualified_name = $id 
+            OR center.symbol_id = $id
+            OR center.file_path = $id
+            OR center.relative_path = $id
+            OR center.file_id = $id
+            OR toLower(center.name) = toLower($id)
+            OR toLower(center.qualified_name) = toLower($id)
+            OR (center:ApiEndpoint AND (center.endpoint_id = $id OR center.path = $id OR center.path ENDS WITH $id OR toLower(center.name) CONTAINS toLower($id)))
+            OR (center:ApiClientCall AND (center.call_id = $id OR center.url = $id))
+            OR (center:ApiContract AND (center.contract_id = $id OR center.path_template = $id))
+        )
+        AND ($repo_id IS NULL OR center.repository_id = $repo_id OR center.file_path CONTAINS $repo_id)
+        WITH center LIMIT 10
         MATCH path = (center)-[r*1..{hops}]-(neighbor)
-        WHERE center.name = $id 
-           OR center.qualified_name = $id 
-           OR center.symbol_id = $id
-           OR center.file_path = $id
-           OR center.relative_path = $id
-           OR center.file_id = $id
-           OR toLower(center.name) = toLower($id)
-           OR toLower(center.qualified_name) = toLower($id)
+        WHERE ($repo_id IS NULL OR neighbor.repository_id = $repo_id OR neighbor.file_path CONTAINS $repo_id)
         RETURN nodes(path) AS nodes, relationships(path) AS relationships
         LIMIT {max_relationships}
         """
@@ -70,7 +80,7 @@ class SubgraphBuilder:
         seen_edges: set[tuple[str, str, str]] = set()
 
         try:
-            records = self.client.execute_read(query, {"id": symbol_identifier})
+            records = self.client.execute_read(query, {"id": symbol_identifier, "repo_id": repository_id})
             for record in records:
                 path_nodes = record.get("nodes", [])
                 path_rels = record.get("relationships", [])

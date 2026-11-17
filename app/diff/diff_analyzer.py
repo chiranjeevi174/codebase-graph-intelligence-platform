@@ -48,7 +48,10 @@ class StructuralDiffAnalyzer:
             f"[StructuralDiffAnalyzer] diff_started for repo_path='{request.repo_path}', base_ref='{request.base_ref}', target_ref='{request.target_ref}'"
         )
 
-        git_svc = self.git_service or GitDiffService(repo_path=request.repo_path)
+        git_svc = self.git_service or GitDiffService(
+            repo_path=request.repo_path,
+            repository=request.repository_id,
+        )
 
         base_sha = git_svc.resolve_ref(request.base_ref)
         target_sha = git_svc.resolve_ref(request.target_ref)
@@ -123,6 +126,7 @@ class StructuralDiffAnalyzer:
                 max_hops=request.max_hops,
                 max_nodes=request.max_nodes,
                 max_relationships=request.max_relationships,
+                include_explanation=False,
             )
             try:
                 impact_res = self.impact_service.analyze_impact(impact_req)

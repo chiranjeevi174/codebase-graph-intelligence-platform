@@ -45,7 +45,8 @@ class GraphBuilder:
         file_query = """
         MERGE (r:Repository {repository_id: $repo_id})
         MERGE (f:File {file_id: $file_id})
-        SET f.file_path = $file_path,
+        SET f.repository_id = $repo_id,
+            f.file_path = $file_path,
             f.relative_path = $relative_path,
             f.language = $language,
             f.lines_of_code = $lines_of_code,
@@ -71,7 +72,8 @@ class GraphBuilder:
 
             symbol_query = f"""
             MERGE (s:{label} {{symbol_id: $symbol_id}})
-            SET s.name = $name,
+            SET s.repository_id = $repo_id,
+                s.name = $name,
                 s.qualified_name = $qualified_name,
                 s.file_path = $file_path,
                 s.language = $language,
@@ -83,6 +85,7 @@ class GraphBuilder:
                 symbol_query,
                 {
                     "symbol_id": symbol.symbol_id,
+                    "repo_id": repo_id,
                     "name": symbol.symbol_name,
                     "qualified_name": symbol.qualified_name,
                     "file_path": symbol.file_path,
@@ -125,18 +128,27 @@ class GraphBuilder:
         # 4. Create CALLS relationships
         for call in data.calls:
             call_query = """
-            MATCH (caller {qualified_name: $caller_qn})
-            MATCH (callee {name: $callee_name})
+            MATCH (caller)
+            WHERE caller.qualified_name = $caller_qn OR caller.name = $caller_qn
+            MATCH (callee)
+            WHERE callee.qualified_name = $callee_name
+               OR callee.name = $callee_name
+               OR callee.qualified_name ENDS WITH ('.' + $callee_name)
+               OR (callee.name = $leaf_name AND ($prefix IS NULL OR callee.qualified_name CONTAINS $prefix OR callee.file_path CONTAINS $prefix))
             MERGE (caller)-[r:CALLS]->(callee)
             SET r.line_number = $line_number,
                 r.file_path = $file_path
             """
+            leaf_name = call.callee_name.split(".")[-1] if call.callee_name else ""
+            prefix = call.callee_name.split(".")[0] if (call.callee_name and "." in call.callee_name) else None
             try:
                 self.client.execute_write(
                     call_query,
                     {
                         "caller_qn": call.caller_qualified_name,
                         "callee_name": call.callee_name,
+                        "leaf_name": leaf_name,
+                        "prefix": prefix,
                         "line_number": call.line_number,
                         "file_path": call.file_path,
                     },
@@ -188,7 +200,20 @@ class GraphBuilder:
                 e.request_schema = $request_schema,
                 e.response_schema = $response_schema
             MERGE (f)-[:DEFINES]->(e)
+            WITH e
+            OPTIONAL MATCH (fn)
+            WHERE (fn:Function OR fn:Method) AND (
+                fn.qualified_name = $controller_symbol
+                OR fn.name = $controller_symbol
+                OR fn.qualified_name ENDS WITH ('.' + $controller_symbol)
+                OR ($handler_name IS NOT NULL AND fn.name = $handler_name AND fn.file_path = $file_path)
+            )
+            FOREACH (_ IN CASE WHEN fn IS NOT NULL THEN [1] ELSE [] END |
+                MERGE (e)-[:HANDLED_BY]->(fn)
+                MERGE (fn)-[:HANDLES]->(e)
+            )
             """
+            handler_leaf = ep.controller_symbol.split(".")[-1] if ep.controller_symbol else None
             try:
                 self.client.execute_write(
                     ep_query,
@@ -201,6 +226,7 @@ class GraphBuilder:
                         "http_method": ep.http_method,
                         "path": ep.path,
                         "controller_symbol": ep.controller_symbol,
+                        "handler_name": handler_leaf,
                         "qualified_name": ep.qualified_name,
                         "name": f"{ep.http_method} {ep.path}",
                         "start_line": ep.start_line,

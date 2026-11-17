@@ -36,7 +36,7 @@ class PRJobRequest(BaseModel):
     provider: str = Field(default="github", description="PR provider platform e.g. github, gitlab")
     repository: str = Field(..., description="Repository full name e.g. owner/repo")
     pr_number: int = Field(default=1, description="Pull/Merge request number")
-    repo_path: str = Field(default=".", description="Path to local repository directory")
+    repo_path: str | None = Field(default=None, description="Path to local repository directory")
     base_ref: str = Field(default="HEAD~1", description="Base Git ref")
     target_ref: str = Field(default="HEAD", description="Target Git ref")
     dry_run: bool = Field(default=True, description="True if running in dry-run mode without posting platform comments")
@@ -47,6 +47,7 @@ class PRJobRequest(BaseModel):
     )
     provider_delivery_id: str | None = Field(default=None, description="Optional webhook delivery event ID")
     action: PRAction = Field(default=PRAction.OPENED, description="Normalized PR/MR action event")
+    force: bool = Field(default=False, description="If True, force fresh job execution bypassing in-flight reuse")
 
 
 class PRAnalysisJob(BaseModel):
@@ -58,7 +59,7 @@ class PRAnalysisJob(BaseModel):
     pr_number: int = Field(..., description="PR/MR ID number")
     base_sha: str = Field(default="HEAD~1", description="Base commit SHA")
     head_sha: str = Field(default="HEAD", description="Target/head commit SHA")
-    repo_path: str = Field(default=".", description="Local repository path")
+    repo_path: str | None = Field(default=None, description="Local repository path")
     dry_run: bool = Field(default=True, description="Dry run status")
     max_hops: int = Field(default=3, description="Max hops")
     status: PRJobStatus = Field(default=PRJobStatus.QUEUED, description="Current job status")

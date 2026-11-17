@@ -1,10 +1,13 @@
 """PR Webhook Service handling signature verification, event parsing, and idempotency."""
 
+from __future__ import annotations
+
+import hashlib
 from typing import Any, ClassVar
 
 from app.config.settings import Settings, get_settings
 from app.integrations.factory import PRProviderFactory
-from app.pr.models import PRAnalysisRequest, PRAnalysisResult
+from app.pr.models import PRAnalysisRequest, PRAnalysisResult, PRAnalysisSummary
 from app.pr.service import PRAnalysisService
 from app.utils.logger import logger
 
@@ -66,7 +69,22 @@ class PRWebhookService:
             dry_run=dry_run,
         )
 
-        result = self.pr_service.analyze_pr(analysis_req)
+        try:
+            result = self.pr_service.analyze_pr(analysis_req)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"[PRWebhookService] Analysis failed during webhook processing: {e}")
+            result = PRAnalysisResult(
+                analysis_run_id=f"pr_run_{hashlib.md5(idempotency_key.encode('utf-8')).hexdigest()[:12]}",
+                provider=provider_name,
+                repository=meta.repository_name,
+                pr_number=meta.pr_number,
+                base_sha=meta.base_sha,
+                head_sha=meta.head_sha,
+                summary=PRAnalysisSummary(),
+                explanation=f"Analysis failed: {e}",
+                validation_status=False,
+                dry_run=dry_run,
+            )
 
         # Cache result
         self._ANALYSIS_CACHE[idempotency_key] = result

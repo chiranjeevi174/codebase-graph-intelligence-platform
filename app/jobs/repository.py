@@ -72,13 +72,26 @@ class JobRepository:
         return key in _MEMORY_DELIVERIES
 
     def save_analysis_run(self, run: Any) -> None:
-        """Save a PRAnalysisRun historical record."""
+        """Save a PRAnalysisRun historical record without duplicates."""
+        from app.jobs.models import PRAnalysisRun
+
         key = f"pr_history:{run.provider.lower()}:{run.repository.lower()}:{run.pr_number}"
         run_json = run.model_dump_json()
 
         r = self._get_redis_client()
         if r:
             try:
+                # Deduplicate and update run with the same analysis_run_id to avoid duplicate history display
+                existing_raws = r.lrange(key, 0, -1)
+                for raw in existing_raws:
+                    try:
+                        existing_obj = PRAnalysisRun.model_validate_json(raw)
+                        if existing_obj.analysis_run_id == run.analysis_run_id:
+                            r.lrem(key, 0, raw)
+                            break
+                    except Exception as e:  # noqa: BLE001
+                        logger.debug(f"[JobRepository] Failed to inspect existing run: {e}")
+
                 r.lpush(key, run_json)
                 r.ltrim(key, 0, 99)
                 r.expire(key, self.settings.JOB_TTL_SECONDS * 7)
@@ -88,12 +101,17 @@ class JobRepository:
 
         if key not in _MEMORY_RUNS:
             _MEMORY_RUNS[key] = []
+        # In-memory deduplication and update
+        _MEMORY_RUNS[key] = [
+            item for item in _MEMORY_RUNS[key]
+            if getattr(item, "analysis_run_id", None) != run.analysis_run_id
+        ]
         # Prepend latest run
         _MEMORY_RUNS[key].insert(0, run)
         _MEMORY_RUNS[key] = _MEMORY_RUNS[key][:100]
 
     def get_pr_history(self, provider: str, repository: str, pr_number: int, limit: int = 20) -> list[Any]:
-        """Fetch historical analysis runs for specified PR."""
+        """Fetch historical analysis runs for specified PR, deduplicated by analysis_run_id."""
         from app.jobs.models import PRAnalysisRun
 
         key = f"pr_history:{provider.lower()}:{repository.lower()}:{pr_number}"
@@ -102,16 +120,25 @@ class JobRepository:
         r = self._get_redis_client()
         if r:
             try:
-                items = r.lrange(key, 0, limit - 1)
+                items = r.lrange(key, 0, limit * 2)
                 for raw in items:
                     history.append(PRAnalysisRun.model_validate_json(raw))
-                if history:
-                    return history
             except Exception as e:  # noqa: BLE001 — Redis error boundary with in-memory fallback
                 logger.warning(f"[JobRepository] Redis error on get_pr_history: {e}")
 
-        mem_items = _MEMORY_RUNS.get(key, [])
-        return mem_items[:limit]
+        if not history:
+            history = _MEMORY_RUNS.get(key, [])
+
+        # Deduplicate by analysis_run_id preserving recency order
+        unique_history: list[PRAnalysisRun] = []
+        seen_run_ids: set[str] = set()
+        for item in history:
+            run_id = getattr(item, "analysis_run_id", None)
+            if run_id and run_id not in seen_run_ids:
+                seen_run_ids.add(run_id)
+                unique_history.append(item)
+
+        return unique_history[:limit]
 
     def create_job(self, job: PRAnalysisJob, idempotency_key: str | None = None) -> PRAnalysisJob:
         """Persist a new job and record idempotency key."""

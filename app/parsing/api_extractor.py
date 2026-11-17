@@ -1,5 +1,6 @@
 """Static API endpoint, client call, and OpenAPI contract extractor."""
 
+import ast
 import json
 import re
 from pathlib import Path
@@ -20,13 +21,13 @@ from app.utils.logger import logger
 class APIExtractor:
     """Extracts static API endpoints, client calls, and OpenAPI contracts from codebase files."""
 
-    # Python FastAPI / Flask route patterns
+    # Python FastAPI / Flask route patterns (used as fallback if AST fails)
     PYTHON_ROUTE_REGEX = re.compile(
-        r"@(?:app|router)\.(get|post|put|delete|patch)\s*\(\s*['\"]([^'\"]+)['\"]",
+        r"@(?:app|router)\.(get|post|put|delete|patch)\s*\(\s*['\"]([^'\"]*)['\"]",
         re.IGNORECASE,
     )
     PYTHON_FLASK_ROUTE_REGEX = re.compile(
-        r"@app\.route\s*\(\s*['\"]([^'\"]+)['\"](?:.*?methods\s*=\s*\[\s*['\"]([^'\"]+)['\"]\s*\])?",
+        r"@app\.route\s*\(\s*['\"]([^'\"]*)['\"](?:.*?methods\s*=\s*\[\s*['\"]([^'\"]+)['\"]\s*\])?",
         re.IGNORECASE,
     )
 
@@ -92,7 +93,11 @@ class APIExtractor:
 
         # 2. Extract Backend Routes by language
         if source_file.language == "python":
-            endpoints.extend(self._extract_python_endpoints(file_path, lines, repository_id))
+            endpoints.extend(
+                self._extract_python_endpoints(
+                    file_path, lines, repository_id, source_file=source_file, content=content
+                )
+            )
         elif source_file.language == "java":
             endpoints.extend(self._extract_java_endpoints(file_path, lines, repository_id))
         elif source_file.language == "go":
@@ -114,17 +119,197 @@ class APIExtractor:
 
         return endpoints, client_calls, contracts
 
-    def _extract_python_endpoints(self, file_path: str, lines: list[str], repository_id: str) -> list[ApiEndpoint]:
+    def _extract_python_endpoints(
+        self,
+        file_path: str,
+        lines: list[str],
+        repository_id: str,
+        source_file: SourceFile | None = None,
+        content: str = "",
+    ) -> list[ApiEndpoint]:
         endpoints: list[ApiEndpoint] = []
         mod_name = file_path.removesuffix(".py").replace("/", ".")
+        source_text = content if content else "\n".join(lines)
 
+        # 1. Primary: AST-based route extraction
+        try:
+            tree = ast.parse(source_text)
+
+            # Detect local APIRouter prefix within this file
+            local_prefix = ""
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Call):
+                    func_id = getattr(node.func, "id", getattr(node.func, "attr", None))
+                    if func_id == "APIRouter":
+                        for kw in node.keywords:
+                            if kw.arg == "prefix" and isinstance(kw.value, ast.Constant) and isinstance(kw.value.value, str):
+                                local_prefix = kw.value.value.strip()
+
+            # Detect parent APIRouter prefix from sibling/parent router.py or main.py
+            parent_prefix = ""
+            actual_file_path = source_file.file_path if source_file else file_path
+            if actual_file_path:
+                try:
+                    curr_p = Path(actual_file_path).resolve()
+                    candidate_paths = [
+                        curr_p.parent / "router.py",
+                        curr_p.parent / "main.py",
+                        curr_p.parent.parent / "router.py",
+                        curr_p.parent.parent / "main.py",
+                    ]
+                    for cand in candidate_paths:
+                        if cand.exists() and cand != curr_p:
+                            cand_text = cand.read_text(encoding="utf-8", errors="ignore")
+                            try:
+                                cand_tree = ast.parse(cand_text)
+                                for cnode in ast.walk(cand_tree):
+                                    if isinstance(cnode, ast.Call):
+                                        cfunc_id = getattr(cnode.func, "id", getattr(cnode.func, "attr", None))
+                                        if cfunc_id == "APIRouter":
+                                            for kw in cnode.keywords:
+                                                if (
+                                                    kw.arg == "prefix"
+                                                    and isinstance(kw.value, ast.Constant)
+                                                    and isinstance(kw.value.value, str)
+                                                ):
+                                                    p_val = kw.value.value.strip()
+                                                    if p_val and p_val != "/":
+                                                        parent_prefix = p_val
+                                                        break
+                                    if parent_prefix:
+                                        break
+                            except Exception as e:  # noqa: BLE001
+                                logger.debug(f"Parent router inspection error: {e}")
+                        if parent_prefix:
+                            break
+                except Exception as e:  # noqa: BLE001
+                    logger.debug(f"Router discovery error: {e}")
+
+            # Combine prefixes
+            full_prefix = ""
+            if parent_prefix and local_prefix:
+                full_prefix = f"/{parent_prefix.strip('/')}/{local_prefix.strip('/')}"
+            elif parent_prefix:
+                full_prefix = f"/{parent_prefix.strip('/')}"
+            elif local_prefix:
+                full_prefix = f"/{local_prefix.strip('/')}"
+
+            for node in tree.body:
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    for dec in node.decorator_list:
+                        # FastAPI style: @app.get(...), @router.post(...)
+                        if isinstance(dec, ast.Call) and isinstance(dec.func, ast.Attribute):
+                            attr_name = dec.func.attr.lower()
+                            if attr_name in ("get", "post", "put", "delete", "patch"):
+                                method = normalize_http_method(attr_name)
+                                raw_path = ""
+                                if (
+                                    dec.args
+                                    and isinstance(dec.args[0], ast.Constant)
+                                    and isinstance(dec.args[0].value, str)
+                                ):
+                                    raw_path = dec.args[0].value.strip()
+
+                                # Combine route path with full prefix
+                                if full_prefix:
+                                    if raw_path and raw_path != "/":
+                                        combined_path = f"{full_prefix.rstrip('/')}/{raw_path.lstrip('/')}"
+                                    else:
+                                        combined_path = full_prefix
+                                else:
+                                    combined_path = raw_path if raw_path else "/"
+
+                                path = normalize_url_path(combined_path)
+                                handler_symbol = f"{mod_name}.{node.name}"
+                                qn = f"{method}:{path}"
+                                eid = generate_symbol_id(repository_id, file_path, qn)
+
+                                # Extract response model schema if annotated
+                                resp_schema = None
+                                for kw in dec.keywords:
+                                    if kw.arg == "response_model":
+                                        resp_schema = ast.unparse(kw.value)
+
+                                # Extract request body schema from parameters
+                                req_schema = None
+                                for arg in node.args.args:
+                                    if arg.arg not in ("self", "cls", "db", "session", "request", "response") and arg.annotation:
+                                        req_schema = ast.unparse(arg.annotation)
+                                        break
+
+                                endpoints.append(
+                                    ApiEndpoint(
+                                        endpoint_id=eid,
+                                        repository_id=repository_id,
+                                        file_path=file_path,
+                                        language="python",
+                                        http_method=method,
+                                        path=path,
+                                        controller_symbol=handler_symbol,
+                                        qualified_name=qn,
+                                        start_line=getattr(node, "lineno", 1),
+                                        end_line=getattr(node, "end_lineno", getattr(node, "lineno", 1) + 10),
+                                        framework="FastAPI",
+                                        request_schema=req_schema,
+                                        response_schema=resp_schema,
+                                    )
+                                )
+
+                        # Flask style: @app.route(...)
+                        elif (
+                            isinstance(dec, ast.Call)
+                            and isinstance(dec.func, ast.Attribute)
+                            and dec.func.attr == "route"
+                        ):
+                            raw_path = "/"
+                            if (
+                                dec.args
+                                and isinstance(dec.args[0], ast.Constant)
+                                and isinstance(dec.args[0].value, str)
+                            ):
+                                raw_path = dec.args[0].value.strip()
+
+                            methods = ["GET"]
+                            for kw in dec.keywords:
+                                if kw.arg == "methods" and isinstance(kw.value, (ast.List, ast.Tuple)):
+                                    methods = [
+                                        elt.value for elt in kw.value.elts if isinstance(elt, ast.Constant)
+                                    ]
+
+                            for m in methods:
+                                method = normalize_http_method(m)
+                                path = normalize_url_path(raw_path)
+                                qn = f"{method}:{path}"
+                                eid = generate_symbol_id(repository_id, file_path, qn)
+                                endpoints.append(
+                                    ApiEndpoint(
+                                        endpoint_id=eid,
+                                        repository_id=repository_id,
+                                        file_path=file_path,
+                                        language="python",
+                                        http_method=method,
+                                        path=path,
+                                        controller_symbol=f"{mod_name}.{node.name}",
+                                        qualified_name=qn,
+                                        start_line=getattr(node, "lineno", 1),
+                                        end_line=getattr(node, "end_lineno", getattr(node, "lineno", 1) + 10),
+                                        framework="Flask",
+                                    )
+                                )
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"AST endpoint extraction encountered error, falling back to regex: {e}")
+
+        # If AST found endpoints, return them
+        if endpoints:
+            return endpoints
+
+        # 2. Fallback: Line-by-line regex extraction for non-standard / partial syntax
         for line_idx, line in enumerate(lines, 1):
             # FastAPI style
             for match in self.PYTHON_ROUTE_REGEX.finditer(line):
                 method = normalize_http_method(match.group(1))
                 path = normalize_url_path(match.group(2))
 
-                # Look ahead for def function_name
                 handler_symbol = f"{mod_name}.route_l{line_idx}"
                 for next_line in lines[line_idx : line_idx + 5]:
                     fn_match = re.search(r"def\s+([a-zA-Z0-9_]+)", next_line)

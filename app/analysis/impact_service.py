@@ -210,28 +210,37 @@ class CodeImpactAnalysisService:
             analysis_truncated=truncated,
         )
 
-        # 6. Retrieve Supplementary Qdrant Vector Context for target and impacted entities
+        # 6. Retrieve Supplementary Qdrant Vector Context & Grounded LLM Explanation
         evidence_snippets: list[NormalizedSearchResult] = []
-        try:
-            evidence_snippets = self.semantic_retriever.retrieve(
-                query=target_qn,
-                limit=5,
-                repository_id=request.repository_id,
-            )
-        except Exception as e:  # noqa: BLE001 # Supplementary semantic retrieval graceful fallback
-            logger.warning(f"[ImpactAnalysisService] Supplementary semantic retrieval failed: {e}")
-            evidence_snippets = []
+        should_explain = getattr(request, "include_explanation", True)
 
-        # 7. Grounded LLM Explanation
-        explanation = self._generate_llm_explanation(
-            target=target_entity,
-            summary=summary,
-            direct_dependents=direct_dependents,
-            transitive_dependents=transitive_dependents,
-            direct_dependencies=direct_dependencies,
-            impact_paths=impact_paths,
-            evidence=evidence_snippets,
-        )
+        if should_explain:
+            try:
+                evidence_snippets = self.semantic_retriever.retrieve(
+                    query=target_qn,
+                    limit=5,
+                    repository_id=request.repository_id,
+                )
+            except Exception as e:  # noqa: BLE001 # Supplementary semantic retrieval graceful fallback
+                logger.warning(f"[ImpactAnalysisService] Supplementary semantic retrieval failed: {e}")
+                evidence_snippets = []
+
+            # 7. Grounded LLM Explanation
+            explanation = self._generate_llm_explanation(
+                target=target_entity,
+                summary=summary,
+                direct_dependents=direct_dependents,
+                transitive_dependents=transitive_dependents,
+                direct_dependencies=direct_dependencies,
+                impact_paths=impact_paths,
+                evidence=evidence_snippets,
+            )
+        else:
+            explanation = (
+                f"Static graph impact analysis completed for '{target_qn}'. "
+                f"Impacted files: {len(affected_files_set)}, direct dependents: {len(direct_dependents)}, "
+                f"transitive dependents: {len(transitive_dependents)}."
+            )
 
         return ImpactAnalysisResult(
             target=target_entity,

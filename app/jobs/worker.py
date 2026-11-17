@@ -49,13 +49,18 @@ async def execute_pr_job_direct(job_id: str) -> dict[str, Any]:
     )
 
     try:
+        # Resolve repository path
+        from app.diff.git_diff_service import resolve_repository_path
+
+        resolved_repo_path = str(resolve_repository_path(repository=job.repository, repo_path=job.repo_path))
+
         # Delegate to PRAnalysisService
         pr_service = PRAnalysisService()
         req = PRAnalysisRequest(
             provider=job.provider,
             repository=job.repository,
             pr_number=job.pr_number,
-            repo_path=job.repo_path,
+            repo_path=resolved_repo_path,
             base_ref=job.base_sha,
             target_ref=job.head_sha,
             dry_run=job.dry_run,
@@ -113,7 +118,16 @@ async def execute_pr_job_direct(job_id: str) -> dict[str, Any]:
         job.duration_ms = round((end_time - start_time) * 1000, 2)
 
         # Classify failure type
-        permanent_keywords = ["not found", "invalid repository", "unauthorized", "invalid/path", "invalid signature"]
+        permanent_keywords = [
+            "not found",
+            "invalid repository",
+            "unauthorized",
+            "invalid/path",
+            "invalid signature",
+            "git revision",
+            "does not exist",
+            "bad object",
+        ]
         is_permanent = any(kw in err_msg.lower() for kw in permanent_keywords)
         job.failure_type = "permanent" if is_permanent else "transient"
 
@@ -124,11 +138,18 @@ async def execute_pr_job_direct(job_id: str) -> dict[str, Any]:
             job.retry_count += 1
             job.status = PRJobStatus.QUEUED
             logger.info(f"[Worker:job_retry] Retrying job '{job.job_id}' (Attempt {job.attempt}/{job.max_attempts}).")
+            repo_db.update_job(job)
+            try:
+                from app.jobs.queue import PRJobQueue
+
+                queue = PRJobQueue()
+                await queue.enqueue_pr_job(job)
+            except Exception as q_err:  # noqa: BLE001 # Retry re-enqueue fallback boundary
+                logger.error(f"[Worker:job_retry_failed] Failed to re-enqueue retried job '{job.job_id}': {q_err}")
         else:
             job.status = PRJobStatus.DEAD_LETTER if job.attempt >= job.max_attempts else PRJobStatus.FAILED
             job.completed_at = end_iso
             job.error = f"Job failed ({job.failure_type}): {err_msg[:250]}"
             job.comment_status = PRCommentStatus.FAILED
-
-        repo_db.update_job(job)
+            repo_db.update_job(job)
         return {"status": job.status.value, "job_id": job.job_id, "error": job.error}

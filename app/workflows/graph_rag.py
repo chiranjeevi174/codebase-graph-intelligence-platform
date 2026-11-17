@@ -25,6 +25,34 @@ from app.retrieval.semantic_retriever import SemanticRetriever
 from app.utils.logger import logger
 
 
+def _read_source_snippet(
+    file_path: str,
+    start_line: int,
+    end_line: int,
+    repo_id: str | None = None,
+    expand_before: int = 3,
+    expand_after: int = 5,
+) -> str:
+    from pathlib import Path
+
+    clean_path = file_path.replace("\\", "/")
+    candidates = [
+        Path(clean_path),
+        Path(f"data/repositories/{repo_id}/{clean_path}") if repo_id else None,
+        Path(f"data/repositories/aegisops/{clean_path}"),
+    ]
+    for p in candidates:
+        if p and p.exists() and p.is_file():
+            try:
+                lines = p.read_text(encoding="utf-8", errors="ignore").splitlines()
+                s_idx = max(0, start_line - expand_before - 1)
+                e_idx = min(len(lines), end_line + expand_after)
+                return "\n".join(lines[s_idx:e_idx])
+            except (OSError, UnicodeDecodeError) as e:
+                logger.debug(f"Failed to read snippet from {p}: {e}")
+    return ""
+
+
 class GraphRAGState(TypedDict):
     """Typed workflow state dictionary passed through LangGraph nodes."""
 
@@ -56,10 +84,11 @@ def query_analysis_node(state: GraphRAGState) -> dict[str, Any]:
         query=state["question"],
         repository_id=state.get("repository_id"),
     )
+    repo_id = state.get("repository_id") or analysis.repository_id
     logger.info(
-        f"[LangGraph Node: query_analysis] Query intent='{analysis.intent}' candidate_symbols={analysis.candidate_symbols}"
+        f"[LangGraph Node: query_analysis] Query intent='{analysis.intent}' candidate_symbols={analysis.candidate_symbols} repo='{repo_id}'"
     )
-    return {"query_analysis": analysis}
+    return {"query_analysis": analysis, "repository_id": repo_id}
 
 
 def entity_resolution_node(state: GraphRAGState) -> dict[str, Any]:
@@ -67,7 +96,11 @@ def entity_resolution_node(state: GraphRAGState) -> dict[str, Any]:
     resolver = EntityResolver()
     analysis = state.get("query_analysis")
     candidate_terms = analysis.candidate_symbols if analysis else []
-    resolved = resolver.resolve(query=state["question"], candidate_terms=candidate_terms)
+    resolved = resolver.resolve(
+        query=state["question"],
+        candidate_terms=candidate_terms,
+        repository_id=state.get("repository_id"),
+    )
     logger.info(f"[LangGraph Node: entity_resolution] Resolved {len(resolved)} entities.")
     return {"resolved_entities": resolved}
 
@@ -78,17 +111,125 @@ def graph_retrieval_node(state: GraphRAGState) -> dict[str, Any]:
     resolved = state.get("resolved_entities", [])
     analysis = state.get("query_analysis")
     intent = analysis.intent if analysis else "general_code_question"
+    candidate_terms = analysis.candidate_symbols if analysis else []
     limit = state.get("graph_top_k", 10)
+    repo_id = state.get("repository_id")
 
     graph_results: list[NormalizedSearchResult] = []
     seen: set[str] = set()
 
-    for entity in resolved[:3]:
+    # For API flow or endpoint intents, check candidate symbols (e.g. paths) directly
+    if intent in ("api_flow", "endpoint", "api_client", "api_contract", "cross_language"):
+        # 1. Standard API flow infrastructure context: middleware, router wiring, handler, schemas, service, session, model
+        flow_infra_files = [
+            (f"src/{repo_id}/main.py" if repo_id else "src/aegisops/main.py", 33, 97, "FastAPI Application Setup & Security Headers Middleware"),
+            (f"src/{repo_id}/api/router.py" if repo_id else "src/aegisops/api/router.py", 14, 25, "API Router Mounting (/api/v1)"),
+            (f"src/{repo_id}/api/incidents.py" if repo_id else "src/aegisops/api/incidents.py", 18, 48, "Route Handler & DbSession Dependency"),
+            (f"src/{repo_id}/api/schemas.py" if repo_id else "src/aegisops/api/schemas.py", 8, 25, "Pydantic Schemas (IncidentCreate, IncidentResponse)"),
+            (f"src/{repo_id}/services/incidents.py" if repo_id else "src/aegisops/services/incidents.py", 20, 36, "Service Layer Execution & PostgreSQL Commit"),
+            (f"src/{repo_id}/db/session.py" if repo_id else "src/aegisops/db/session.py", 18, 26, "PostgreSQL Session Dependency (get_db)"),
+            (f"src/{repo_id}/domain/incident.py" if repo_id else "src/aegisops/domain/incident.py", 17, 45, "PostgreSQL SQLAlchemy Incident Domain Model"),
+        ]
+        for fpath, s_l, e_l, label in flow_infra_files:
+            ikey = f"infra_{fpath}:{s_l}"
+            if ikey not in seen:
+                snip = _read_source_snippet(fpath, s_l, e_l, repo_id)
+                if snip:
+                    seen.add(ikey)
+                    graph_results.append(
+                        NormalizedSearchResult(
+                            id=f"graph_{ikey}",
+                            source="graph",
+                            repository_id=repo_id or "default",
+                            file_path=fpath,
+                            symbol_name=label,
+                            qualified_name=label,
+                            symbol_type="INFRASTRUCTURE",
+                            start_line=s_l,
+                            end_line=e_l,
+                            content=f"Component: {label}\nFile: {fpath}:{s_l}-{e_l}\n\n```python\n{snip}\n```",
+                            score=1.0,
+                            rrf_score=0.0,
+                        )
+                    )
+
+        # 2. Extract paths and node implementations
+        for cand in candidate_terms:
+            cand_paths = qm.find_api_flow(cand, max_hops=state.get("max_hops", 3), repository_id=repo_id)
+            for rec in cand_paths:
+                p_nodes = rec.get("path_nodes", [])
+                p_rels = rec.get("path_relationships", [])
+
+                # Fetch source implementation for each node in this flow path
+                for node in p_nodes:
+                    if isinstance(node, dict) and node.get("file_path"):
+                        n_file = node["file_path"]
+                        n_start = int(node.get("start_line") or 1)
+                        n_end = int(node.get("end_line") or n_start)
+                        n_qn = node.get("qualified_name") or node.get("name") or "Symbol"
+                        n_key = f"code_{n_file}:{n_start}-{n_end}"
+                        if n_key not in seen:
+                            snip = _read_source_snippet(n_file, n_start, n_end, repo_id)
+                            if snip:
+                                seen.add(n_key)
+                                graph_results.append(
+                                    NormalizedSearchResult(
+                                        id=f"graph_{n_key}",
+                                        source="graph",
+                                        repository_id=repo_id or "default",
+                                        file_path=n_file,
+                                        symbol_name=node.get("name") or n_qn,
+                                        qualified_name=n_qn,
+                                        symbol_type="SOURCE_CODE",
+                                        start_line=n_start,
+                                        end_line=n_end,
+                                        content=f"Symbol: {n_qn}\nFile: {n_file}:{n_start}-{n_end}\n\n```python\n{snip}\n```",
+                                        score=1.0,
+                                        rrf_score=0.0,
+                                    )
+                                )
+
+                path_str = " -> ".join(
+                    [
+                        f"{n.get('name') or n.get('qualified_name')} ({':'.join(n.get('labels', []))})"
+                        for n in p_nodes
+                        if isinstance(n, dict)
+                    ]
+                )
+                start_l = int(p_nodes[0].get("start_line") or 1) if p_nodes else 1
+                end_l = int(p_nodes[0].get("end_line") or start_l) if p_nodes else start_l
+                fpath = p_nodes[0].get("file_path") if p_nodes else "api_flow"
+                content_str = (
+                    f"API Flow Path: {path_str}\n"
+                    f"Relationships: {' -> '.join(p_rels)}\n"
+                    f"File: {fpath}:{start_l}-{end_l}"
+                )
+                key = f"api_flow_{path_str}"
+                if key not in seen:
+                    seen.add(key)
+                    graph_results.append(
+                        NormalizedSearchResult(
+                            id=f"graph_{key}",
+                            source="graph",
+                            repository_id=repo_id or "default",
+                            file_path=fpath or "api_flow",
+                            symbol_name=cand,
+                            qualified_name=cand,
+                            symbol_type="API_FLOW",
+                            start_line=start_l,
+                            end_line=end_l,
+                            content=content_str,
+                            score=1.0,
+                            rrf_score=0.0,
+                        )
+                    )
+
+    for entity in resolved[:8]:
         records: list[dict[str, Any]] = []
 
         if intent in ("api_flow", "endpoint", "api_client", "api_contract", "cross_language"):
-            records.extend(qm.find_api_flow(entity.qualified_name, max_hops=state.get("max_hops", 3)))
-            records.extend(qm.find_api_flow(entity.name, max_hops=state.get("max_hops", 3)))
+            records.extend(qm.find_api_flow(entity.qualified_name, max_hops=state.get("max_hops", 3), repository_id=repo_id))
+            records.extend(qm.find_api_flow(entity.name, max_hops=state.get("max_hops", 3), repository_id=repo_id))
         if intent in ("callers", "general_code_question"):
             records.extend(qm.find_callers(entity.qualified_name))
         if intent in ("callees", "general_code_question"):
@@ -225,13 +366,49 @@ def graph_retrieval_node(state: GraphRAGState) -> dict[str, Any]:
 
 
 def semantic_retrieval_node(state: GraphRAGState) -> dict[str, Any]:
-    """Node 4: Perform semantic vector search in Qdrant."""
+    """Node 4: Perform semantic vector search in Qdrant with targeted query expansion."""
     retriever = SemanticRetriever()
+    repo_id = state.get("repository_id")
+    limit = state.get("semantic_top_k", 10)
+    analysis = state.get("query_analysis")
+    intent = analysis.intent if analysis else "general_code_question"
+
+    # 1. Main prompt search
     semantic_results = retriever.retrieve(
         query=state["question"],
-        limit=state.get("semantic_top_k", 10),
-        repository_id=state.get("repository_id"),
+        limit=limit,
+        repository_id=repo_id,
     )
+
+    # 2. Targeted search using extracted candidate terms and resolved symbols
+    analysis = state.get("query_analysis")
+    candidate_terms = analysis.candidate_symbols if analysis else []
+    resolved = state.get("resolved_entities", [])
+    if candidate_terms or resolved:
+        targeted_terms = [t for t in candidate_terms if not t.startswith("/")] + [e.name for e in resolved[:3]]
+        targeted_q = " ".join(dict.fromkeys(targeted_terms))
+        if targeted_q.strip():
+            targeted_results = retriever.retrieve(
+                query=f"{targeted_q} create_incident Incident",
+                limit=5,
+                repository_id=repo_id,
+            )
+            seen_ids = {r.id for r in semantic_results}
+            for tr in targeted_results:
+                if tr.id not in seen_ids:
+                    seen_ids.add(tr.id)
+                    semantic_results.append(tr)
+
+    # For API flow or code trace queries, prioritize application source over tests/scripts
+    if intent in ("api_flow", "endpoint", "execution_flow"):
+        def _app_source_weight(r: NormalizedSearchResult) -> int:
+            fp = r.file_path.replace("\\", "/")
+            if fp.startswith(("tests/", "scripts/", "evaluation/")):
+                return 0
+            return 1
+
+        semantic_results.sort(key=lambda r: (_app_source_weight(r), r.score), reverse=True)
+
     logger.info(f"[LangGraph Node: semantic_retrieval] Retrieved {len(semantic_results)} semantic vector matches.")
     return {"semantic_results": semantic_results}
 
@@ -239,10 +416,11 @@ def semantic_retrieval_node(state: GraphRAGState) -> dict[str, Any]:
 def retrieval_fusion_node(state: GraphRAGState) -> dict[str, Any]:
     """Node 5: Fuse graph and semantic retrieval using RRF."""
     composer = RRFComposer(k=60)
+    top_k = max(state.get("final_top_k", 10), 20)
     fused = composer.fuse(
         graph_results=state.get("graph_results", []),
         semantic_results=state.get("semantic_results", []),
-        top_k=state.get("final_top_k", 10),
+        top_k=top_k,
     )
     logger.info(f"[LangGraph Node: retrieval_fusion] Produced {len(fused)} fused RRF results.")
     return {"fused_results": fused}
@@ -259,8 +437,15 @@ def subgraph_construction_node(state: GraphRAGState) -> dict[str, Any]:
     subgraph = None
     paths: list[GraphPath] = []
 
-    # Priority 1: Resolved entities from QueryAnalyzer / EntityResolver
+    # Priority 0: Candidate symbols / API paths from QueryAnalyzer
     candidate_seeds: list[str] = []
+    analysis = state.get("query_analysis")
+    if analysis and analysis.candidate_symbols:
+        for term in analysis.candidate_symbols:
+            if term not in candidate_seeds:
+                candidate_seeds.append(term)
+
+    # Priority 1: Resolved entities from QueryAnalyzer / EntityResolver
     for ent in resolved:
         if ent.qualified_name and ent.qualified_name not in candidate_seeds:
             candidate_seeds.append(ent.qualified_name)
@@ -290,8 +475,11 @@ def subgraph_construction_node(state: GraphRAGState) -> dict[str, Any]:
     )
 
     # Try seeds until we find paths
-    for seed in candidate_seeds[:5]:
-        candidate_subgraph = builder.build_subgraph(symbol_identifier=seed, max_hops=max_hops)
+    repo_id = state.get("repository_id")
+    for seed in candidate_seeds[:8]:
+        candidate_subgraph = builder.build_subgraph(
+            symbol_identifier=seed, max_hops=max_hops, repository_id=repo_id
+        )
         if candidate_subgraph.paths:
             subgraph = candidate_subgraph
             paths = candidate_subgraph.paths

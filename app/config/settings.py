@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     QDRANT_COLLECTION: str = "codebase_chunks"
 
     # Redis Queue & Worker settings
-    REDIS_URL: str = "redis://localhost:6379"
+    REDIS_URL: str = "redis://127.0.0.1:6379"
     JOB_TTL_SECONDS: int = 86400
     IDEMPOTENCY_TTL_SECONDS: int = 86400
     WORKER_MAX_JOBS: int = 10

@@ -51,7 +51,7 @@ class EntityResolver:
         for term in candidate_symbols:
             try:
                 # 1. Exact or Qualified Graph Lookup in Neo4j
-                matches = self.query_manager.find_symbol(term)
+                matches = self.query_manager.find_symbol(term, repository_id=repository_id)
                 if matches:
                     for m in matches:
                         symbol_id = str(m.get("symbol_id") or m.get("name") or term)
@@ -74,15 +74,22 @@ class EntityResolver:
                                 )
                             )
                 else:
-                    # Fallback: substring / qualified name matching
+                    # Fallback: substring / qualified name matching with repo scope
                     fallback_query = """
                     MATCH (s)
-                    WHERE toLower(s.name) CONTAINS toLower($term) OR toLower(s.qualified_name) CONTAINS toLower($term)
+                    WHERE (
+                        toLower(s.name) CONTAINS toLower($term) 
+                        OR toLower(s.qualified_name) CONTAINS toLower($term)
+                        OR (s:ApiEndpoint AND (s.path CONTAINS $term OR toLower(s.name) CONTAINS toLower($term)))
+                    )
+                    AND ($repo_id IS NULL OR s.repository_id = $repo_id OR s.file_path CONTAINS $repo_id)
                     RETURN labels(s) AS labels, s.name AS name, s.qualified_name AS qualified_name,
                            s.file_path AS file_path, s.start_line AS start_line, s.end_line AS end_line
-                    LIMIT 3
+                    LIMIT 5
                     """
-                    sub_matches = self.query_manager.client.execute_read(fallback_query, {"term": term})
+                    sub_matches = self.query_manager.client.execute_read(
+                        fallback_query, {"term": term, "repo_id": repository_id}
+                    )
                     for m in sub_matches:
                         qn = str(m.get("qualified_name") or m.get("name") or term)
                         symbol_id = f"sub_{qn}"

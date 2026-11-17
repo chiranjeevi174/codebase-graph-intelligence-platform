@@ -36,11 +36,14 @@ export async function handlePRSubmit() {
   }
 
   try {
+    const isFixture = ["sample_repo", "diff_repo", "multi_language_repo"].includes(repo);
+    const repoPath = isFixture ? `tests/fixtures/${repo}` : null;
+
     const payload = {
       provider: provider,
       repository: repo,
       pr_number: prNum,
-      repo_path: repo.includes("/") ? null : `tests/fixtures/${repo || state.selectedRepository || 'sample_repo'}`,
+      repo_path: repoPath,
       base_ref: baseRef,
       target_ref: targetRef,
       dry_run: dryRun,

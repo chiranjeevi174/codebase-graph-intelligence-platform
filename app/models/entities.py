@@ -392,6 +392,9 @@ class ImpactAnalysisRequest(BaseModel):
     max_hops: int | str = Field(2, description="Maximum traversal depth (1, 2, 3, or 'all')")
     max_nodes: int = Field(50, description="Maximum total nodes to evaluate")
     max_relationships: int = Field(100, description="Maximum relationships to traverse")
+    include_explanation: bool = Field(
+        default=True, description="Whether to invoke LLM to generate an impact explanation"
+    )
 
 
 class ImpactAnalysisResult(BaseModel):
